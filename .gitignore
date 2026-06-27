@@ -1,0 +1,7 @@
+dist/
+dist-local/
+release/
+.tmp-check/
+.tmp-*/
+node_modules/
+.DS_Store

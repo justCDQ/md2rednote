@@ -1,0 +1,38 @@
+{
+  "name": "md2rednote",
+  "version": "0.1.0",
+  "description": "Convert Markdown articles into Xiaohongshu-ready image cards.",
+  "type": "module",
+  "bin": {
+    "md2rednote": "./bin/xhs-cardgen.mjs",
+    "xhs-cardgen": "./bin/xhs-cardgen.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node ./bin/xhs-cardgen.mjs",
+    "example": "node ./bin/xhs-cardgen.mjs build ./examples/event-loop-mini.md --out ./dist/event-loop-mini",
+    "check": "node ./scripts/check.mjs",
+    "local:dev": "bun run apps/local/server.ts",
+    "local:build": "bash build/create-local-app.sh"
+  },
+  "keywords": [
+    "markdown",
+    "xiaohongshu",
+    "cards",
+    "playwright",
+    "typora"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.45.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
