@@ -148,6 +148,7 @@ async function exportProject(payload: SavePayload) {
     deck,
     outDir: cardsDir,
     chromePath: payload.chromePath,
+    theme: payload.theme || "warm-tech",
   });
 
   return {

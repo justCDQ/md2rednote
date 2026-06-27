@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { renderSingleSlideHtml } from "../render/render-deck-html.mjs";
 
 const DEFAULT_CHROME_CANDIDATES = {
   darwin: [
@@ -39,13 +40,15 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitForDevtools(port, timeoutMs = 10000) {
+async function waitForDevtools(port, timeoutMs = 20000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/json/version`);
-      if (res.ok) return await res.json();
-    } catch {}
+    for (const host of ["127.0.0.1", "localhost"]) {
+      try {
+        const res = await fetch(`http://${host}:${port}/json/version`);
+        if (res.ok) return await res.json();
+      } catch {}
+    }
     await delay(150);
   }
   throw new Error("Timed out waiting for Chrome DevTools.");
@@ -84,11 +87,15 @@ async function openWebSocket(url) {
 }
 
 async function createPage(port, targetUrl) {
-  const res = await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(targetUrl)}`, {
-    method: "PUT",
-  });
-  if (!res.ok) throw new Error("Failed to create Chrome target.");
-  return res.json();
+  for (const host of ["127.0.0.1", "localhost"]) {
+    try {
+      const res = await fetch(`http://${host}:${port}/json/new?${encodeURIComponent(targetUrl)}`, {
+        method: "PUT",
+      });
+      if (res.ok) return res.json();
+    } catch {}
+  }
+  throw new Error("Failed to create Chrome target.");
 }
 
 async function waitForPageReady(ws) {
@@ -102,6 +109,29 @@ async function waitForPageReady(ws) {
   await chromeCommand(ws, "Runtime.evaluate", {
     expression: `document.fonts && document.fonts.ready ? document.fonts.ready.then(() => true) : true`,
     awaitPromise: true,
+  });
+}
+
+async function fitViewportToPage(ws) {
+  const result = await chromeCommand(ws, "Runtime.evaluate", {
+    expression: `({
+      width: Math.ceil(Math.max(
+        document.documentElement.scrollWidth,
+        document.body ? document.body.scrollWidth : 0
+      )),
+      height: Math.ceil(Math.max(
+        document.documentElement.scrollHeight,
+        document.body ? document.body.scrollHeight : 0
+      ))
+    })`,
+    returnByValue: true,
+  });
+  const size = result.result.value;
+  await chromeCommand(ws, "Emulation.setDeviceMetricsOverride", {
+    width: Math.max(1, size.width),
+    height: Math.max(1, size.height),
+    deviceScaleFactor: 1,
+    mobile: false,
   });
 }
 
@@ -127,6 +157,31 @@ function pngBufferFromBase64(data) {
   return Buffer.from(data, "base64");
 }
 
+async function captureSingleSlidePng({ html, deck, chromePath, outPath }) {
+  return withSystemChromePage({
+    html,
+    deck,
+    chromePath,
+    callback: async ({ ws }) => {
+      const width = deck.width || 1242;
+      const height = deck.height || 1660;
+      const result = await chromeCommand(ws, "Page.captureScreenshot", {
+        format: "png",
+        captureBeyondViewport: true,
+        clip: {
+          x: 0,
+          y: 0,
+          width,
+          height,
+          scale: 1,
+        },
+        fromSurface: true,
+      });
+      await writeFile(outPath, pngBufferFromBase64(result.data));
+    },
+  });
+}
+
 async function withSystemChromePage({ html, deck, chromePath, callback }) {
   const executablePath = findSystemChrome(chromePath);
   if (!executablePath) {
@@ -144,8 +199,11 @@ async function withSystemChromePage({ html, deck, chromePath, callback }) {
     [
       "--headless=new",
       "--disable-gpu",
+      "--disable-dev-shm-usage",
       "--no-first-run",
       "--no-default-browser-check",
+      "--remote-debugging-address=127.0.0.1",
+      "--remote-allow-origins=*",
       `--remote-debugging-port=${port}`,
       `--user-data-dir=${userDataDir}`,
       `--window-size=${deck.width || 1242},${deck.height || 1660}`,
@@ -164,6 +222,7 @@ async function withSystemChromePage({ html, deck, chromePath, callback }) {
     await chromeCommand(ws, "Page.enable");
     await chromeCommand(ws, "Runtime.enable");
     await waitForPageReady(ws);
+    await fitViewportToPage(ws);
     const result = await callback({ ws, executablePath });
     return result;
   } finally {
@@ -195,39 +254,42 @@ export async function exportPngCardsWithSystemChrome({
   outDir,
   chromePath,
   filePrefix = "card",
+  theme = "warm-tech",
+  includeOverflowReport = false,
 }) {
   await mkdir(outDir, { recursive: true });
+  const executablePath = findSystemChrome(chromePath);
+  if (!executablePath) {
+    throw new Error("Chrome or Edge was not found. Install Chrome/Edge or pass a Chrome path.");
+  }
 
-  return withSystemChromePage({
-    html,
-    deck,
-    chromePath,
-    callback: async ({ ws, executablePath }) => {
-      const cards = await getCards(ws);
-      const files = [];
+  let overflowReport = [];
+  if (includeOverflowReport) {
+    try {
+      const measured = await measureHtmlOverflowWithSystemChrome({ html, deck, chromePath });
+      overflowReport = measured.overflowReport;
+    } catch {
+      overflowReport = [];
+    }
+  }
 
-      for (const card of cards) {
-        const result = await chromeCommand(ws, "Page.captureScreenshot", {
-          format: "png",
-          clip: {
-            x: card.x,
-            y: card.y,
-            width: card.width,
-            height: card.height,
-            scale: 1,
-          },
-          fromSurface: true,
-        });
-        const filePath = path.join(outDir, `${filePrefix}-${String(card.index).padStart(2, "0")}.png`);
-        await writeFile(filePath, pngBufferFromBase64(result.data));
-        files.push(filePath);
-      }
+  const files = [];
 
-      return {
-        files,
-        overflowReport: cards.map(({ index, hasOverflow }) => ({ index, hasOverflow })),
-        chromePath: executablePath,
-      };
-    },
-  });
+  for (let index = 0; index < deck.slides.length; index += 1) {
+    const slide = deck.slides[index];
+    const outputPath = path.join(outDir, `${filePrefix}-${String(index + 1).padStart(2, "0")}.png`);
+    await captureSingleSlidePng({
+      html: renderSingleSlideHtml(deck, slide, { theme }),
+      deck,
+      chromePath,
+      outPath: outputPath,
+    });
+    files.push(outputPath);
+  }
+
+  return {
+    files,
+    overflowReport,
+    chromePath: executablePath,
+  };
 }
