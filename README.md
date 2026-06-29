@@ -141,12 +141,29 @@ Built-in themes:
 - `clean-white`：清爽白底
 - `dark-code`：深色代码风
 - `mint-editorial`：薄荷杂志风
+- `tech-black-gold`：技术黑金
+- `minimal-paper`：极简纸感
+- `magazine-bold`：杂志标题风
+- `notebook-soft`：日系手账
+- `launch-deck`：产品发布会风
+- `academic-note`：学术笔记风
 
 CLI example:
 
 ```bash
 npx md2rednote build ./article.md --theme dark-code
 ```
+
+## Edit Generated Cards
+
+The local app lets you adjust the generated deck before export:
+
+- edit card kicker, title, hero, footer, and block text
+- duplicate, delete, and reorder cards
+- switch visual themes without regenerating from Markdown
+- save/export the edited `slides.json`
+
+Manual edits apply to the generated deck only. They do not rewrite the original Markdown file. If you regenerate from Markdown, the app will warn that manual edits will be overwritten.
 
 ## Output
 

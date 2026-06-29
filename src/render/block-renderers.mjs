@@ -1,4 +1,5 @@
 import { escapeHtml, inlineMarkdown } from "./escape-html.mjs";
+import { highlightCode } from "./code-highlight.mjs";
 
 function renderParagraph(block) {
   return `<p>${inlineMarkdown(block.text)}</p>`;
@@ -10,7 +11,7 @@ function renderList(tag, items) {
 
 function renderCode(block) {
   const label = block.caption ? `${block.lang || "text"} / ${block.caption}` : block.lang || "text";
-  return `<pre class="code" data-lang="${escapeHtml(label)}"><code>${escapeHtml(block.source.trim())}</code></pre>`;
+  return `<pre class="code" data-lang="${escapeHtml(label)}"><code>${highlightCode(block.source, block.lang)}</code></pre>`;
 }
 
 function renderQuote(block) {

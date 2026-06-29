@@ -18,7 +18,7 @@ const defaultPalette = {
   inlineBorder: "#ded5c7",
 };
 
-export function createCardTheme({ width, height, palette = {} }) {
+export function createCardTheme({ width, height, palette = {}, extraCss = "" }) {
   const p = { ...defaultPalette, ...palette };
   return `
     :root {
@@ -185,6 +185,15 @@ export function createCardTheme({ width, height, palette = {} }) {
       font-weight: 900;
       text-transform: uppercase;
     }
+    pre.code code {
+      display: block;
+    }
+    .tok-comment { color: ${p.codeComment || "#8f9b8d"}; }
+    .tok-keyword { color: ${p.codeKeyword || p.codeAccent}; font-weight: 850; }
+    .tok-string { color: ${p.codeString || "#f6c177"}; }
+    .tok-number { color: ${p.codeNumber || "#9ccfd8"}; }
+    .tok-literal { color: ${p.codeLiteral || "#c4a7e7"}; font-weight: 760; }
+    .tok-property { color: ${p.codeProperty || "#95b8ff"}; }
     .image-block {
       margin: 0;
       overflow: hidden;
@@ -307,5 +316,6 @@ export function createCardTheme({ width, height, palette = {} }) {
       font-size: 26px;
       font-weight: 900;
     }
+    ${extraCss}
   `;
 }

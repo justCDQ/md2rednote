@@ -62,8 +62,8 @@ function parseBlockquote(lines, startIndex) {
 }
 
 function parseCodeBlock(lines, startIndex) {
-  const open = lines[startIndex].match(/^\s*```([A-Za-z0-9_-]+)?\s*$/);
-  const lang = open?.[1] || "text";
+  const open = lines[startIndex].match(/^\s*```\s*([^\s`]*)?.*$/);
+  const lang = open?.[1]?.trim() || "text";
   const source = [];
   let index = startIndex + 1;
 

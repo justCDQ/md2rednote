@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { DEFAULT_LIMITS } from "../../src/core/schema.mjs";
 import { parseMarkdown } from "../../src/markdown/parse-markdown.mjs";
-import { planSlides } from "../../src/planner/plan-slides.mjs";
+import { planSlides, refreshSlideFooters } from "../../src/planner/plan-slides.mjs";
 import { renderDeckHtml } from "../../src/render/render-deck-html.mjs";
 import {
   exportPngCardsWithSystemChrome,
@@ -37,6 +37,13 @@ type RenderPayload = {
 };
 
 type SavePayload = RenderPayload & {
+  outputDir?: string;
+  chromePath?: string;
+};
+
+type DeckPayload = {
+  deck?: any;
+  theme?: string;
   outputDir?: string;
   chromePath?: string;
 };
@@ -118,7 +125,7 @@ function createReport(deck: any, overflowReport: Array<{ index: number; hasOverf
 
 async function readJson(req: Request) {
   try {
-    return (await req.json()) as SavePayload;
+    return (await req.json()) as SavePayload & DeckPayload;
   } catch {
     throw new Error("Invalid JSON payload.");
   }
@@ -153,11 +160,73 @@ async function saveProject(payload: SavePayload) {
   };
 }
 
+function normalizeDeckPayload(payload: DeckPayload) {
+  if (!payload.deck || !Array.isArray(payload.deck.slides)) {
+    throw new AppError("INVALID_DECK", "卡片数据无效，请重新生成预览。");
+  }
+  const deck = refreshSlideFooters(payload.deck);
+  const html = renderDeckHtml(deck, { theme: payload.theme || "warm-tech" });
+  return { deck, html };
+}
+
+function resolveOutputDir(payload: { outputDir?: string }, deck: any) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const baseName = sanitizeName(deck.title || "cards");
+  return payload.outputDir?.trim() || path.join(DEFAULT_OUTPUT, `${baseName}-${stamp}`);
+}
+
+async function saveDeckProject(payload: DeckPayload) {
+  const { deck, html } = normalizeDeckPayload(payload);
+  const outputDir = resolveOutputDir(payload, deck);
+
+  ensureWritableDirectory(outputDir);
+  writeFileSync(path.join(outputDir, "slides.json"), `${JSON.stringify(deck, null, 2)}\n`, "utf8");
+  writeFileSync(path.join(outputDir, "preview.html"), html, "utf8");
+
+  return {
+    deck,
+    outputDir,
+    slidesPath: path.join(outputDir, "slides.json"),
+    previewPath: path.join(outputDir, "preview.html"),
+    report: createReport(deck),
+  };
+}
+
 async function exportProject(payload: SavePayload) {
   const { deck, html } = createDeckFromMarkdown(payload);
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const baseName = sanitizeName(deck.title || path.basename(payload.filename || "cards"));
   const outputDir = payload.outputDir?.trim() || path.join(DEFAULT_OUTPUT, `${baseName}-${stamp}`);
+  const cardsDir = path.join(outputDir, "cards");
+
+  ensureWritableDirectory(outputDir);
+  writeFileSync(path.join(outputDir, "slides.json"), `${JSON.stringify(deck, null, 2)}\n`, "utf8");
+  writeFileSync(path.join(outputDir, "preview.html"), html, "utf8");
+
+  const exportResult = await exportPngCardsWithSystemChrome({
+    html,
+    deck,
+    outDir: cardsDir,
+    chromePath: payload.chromePath,
+    theme: payload.theme || "warm-tech",
+  });
+
+  return {
+    deck,
+    outputDir,
+    cardsDir,
+    slidesPath: path.join(outputDir, "slides.json"),
+    previewPath: path.join(outputDir, "preview.html"),
+    files: exportResult.files,
+    overflowReport: exportResult.overflowReport,
+    report: createReport(deck, exportResult.overflowReport),
+    chromePath: exportResult.chromePath,
+  };
+}
+
+async function exportDeckProject(payload: DeckPayload) {
+  const { deck, html } = normalizeDeckPayload(payload);
+  const outputDir = resolveOutputDir(payload, deck);
   const cardsDir = path.join(outputDir, "cards");
 
   ensureWritableDirectory(outputDir);
@@ -211,6 +280,20 @@ Bun.serve({
 
       if (url.pathname === "/api/export-png" && req.method === "POST") {
         return json(await exportProject(await readJson(req)));
+      }
+
+      if (url.pathname === "/api/render-deck" && req.method === "POST") {
+        const payload = await readJson(req);
+        const { deck, html } = normalizeDeckPayload(payload);
+        return json({ deck, html, report: createReport(deck) });
+      }
+
+      if (url.pathname === "/api/save-deck" && req.method === "POST") {
+        return json(await saveDeckProject(await readJson(req)));
+      }
+
+      if (url.pathname === "/api/export-deck-png" && req.method === "POST") {
+        return json(await exportDeckProject(await readJson(req)));
       }
 
       if (url.pathname === "/api/system" && req.method === "GET") {

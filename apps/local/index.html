@@ -176,6 +176,127 @@
       background: #fffdf8;
       font-size: 13px;
     }
+    .section-title {
+      margin: 0;
+      color: #171714;
+      font-size: 14px;
+      font-weight: 850;
+      line-height: 1.2;
+    }
+    .theme-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .theme-card {
+      height: auto;
+      min-height: 96px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      padding: 12px;
+      border-radius: 8px;
+      background: #fffdf8;
+      text-align: left;
+      font-weight: 700;
+    }
+    .theme-card.active {
+      border-color: #9b3f30;
+      background: #fff6ea;
+      box-shadow: inset 0 0 0 1px #9b3f30;
+    }
+    .theme-name {
+      color: #171714;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+    .theme-description {
+      color: #7b7063;
+      font-size: 11px;
+      line-height: 1.35;
+      font-weight: 500;
+    }
+    .swatches {
+      display: flex;
+      gap: 5px;
+    }
+    .swatches span {
+      width: 18px;
+      height: 18px;
+      border: 1px solid rgba(23, 23, 20, 0.14);
+      border-radius: 999px;
+    }
+    .editor {
+      display: none;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(23, 23, 20, 0.14);
+      border-radius: 8px;
+      background: #fffaf0;
+    }
+    .editor.active {
+      display: grid;
+    }
+    .slide-list {
+      display: grid;
+      gap: 6px;
+      max-height: 190px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .slide-tab {
+      height: auto;
+      min-height: 34px;
+      padding: 8px 10px;
+      background: #fffdf8;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 750;
+      line-height: 1.25;
+    }
+    .slide-tab.active {
+      border-color: #9b3f30;
+      background: #f7e9dd;
+      color: #7a271c;
+    }
+    .editor-actions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .editor-actions button,
+    .apply-editor {
+      height: 34px;
+      font-size: 12px;
+    }
+    .editor-fields {
+      display: grid;
+      gap: 10px;
+    }
+    .editor-fields input {
+      height: 36px;
+    }
+    .editor-fields textarea {
+      min-height: 84px;
+      font-size: 12px;
+    }
+    .block-editor {
+      display: grid;
+      gap: 7px;
+      padding: 10px;
+      border: 1px solid rgba(23, 23, 20, 0.12);
+      border-radius: 8px;
+      background: #fffdf8;
+    }
+    .block-editor h3 {
+      margin: 0;
+      color: #62584c;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .hidden-control {
+      display: none;
+    }
     select {
       width: 100%;
       height: 40px;
@@ -253,15 +374,6 @@
           <input id="brand" placeholder="显示在卡片底部" />
         </label>
         <label>
-          主题风格
-          <select id="theme">
-            <option value="warm-tech">暖色技术风</option>
-            <option value="clean-white">清爽白底</option>
-            <option value="dark-code">深色代码风</option>
-            <option value="mint-editorial">薄荷杂志风</option>
-          </select>
-        </label>
-        <label>
           每页字数
           <input id="maxChars" type="number" min="120" value="360" />
           <span class="field-note">控制每张卡片的文字密度，越小拆页越多。</span>
@@ -272,6 +384,27 @@
           <span class="field-note">段落、列表、代码块、表格都会算作内容块。</span>
         </label>
       </div>
+
+      <label class="hidden-control">
+        主题风格
+        <select id="theme">
+          <option value="warm-tech">暖色技术风</option>
+          <option value="clean-white">清爽白底</option>
+          <option value="dark-code">深色代码风</option>
+          <option value="mint-editorial">薄荷杂志风</option>
+          <option value="tech-black-gold">技术黑金</option>
+          <option value="minimal-paper">极简纸感</option>
+          <option value="magazine-bold">杂志标题风</option>
+          <option value="notebook-soft">日系手账</option>
+          <option value="launch-deck">产品发布会风</option>
+          <option value="academic-note">学术笔记风</option>
+        </select>
+      </label>
+
+      <section>
+        <p class="section-title">主题皮肤</p>
+        <div id="themeGrid" class="theme-grid"></div>
+      </section>
 
       <label>
         输出文件夹路径
@@ -305,6 +438,19 @@
       </div>
 
       <p id="status" class="status">准备就绪</p>
+
+      <section id="editor" class="editor" aria-label="卡片内容编辑">
+        <p class="section-title">卡片内容编辑</p>
+        <div id="slideList" class="slide-list"></div>
+        <div class="editor-actions">
+          <button id="moveUp" type="button">上移</button>
+          <button id="moveDown" type="button">下移</button>
+          <button id="duplicateSlide" type="button">复制</button>
+          <button id="deleteSlide" type="button">删除</button>
+        </div>
+        <div id="editorFields" class="editor-fields"></div>
+        <button id="applyEditor" class="apply-editor primary" type="button">应用修改</button>
+      </section>
     </aside>
 
     <main class="preview">
@@ -344,7 +490,29 @@
       systemOutput: document.querySelector("#systemOutput"),
       systemChrome: document.querySelector("#systemChrome"),
       copyDiagnostics: document.querySelector("#copyDiagnostics"),
+      themeGrid: document.querySelector("#themeGrid"),
+      editor: document.querySelector("#editor"),
+      slideList: document.querySelector("#slideList"),
+      editorFields: document.querySelector("#editorFields"),
+      applyEditor: document.querySelector("#applyEditor"),
+      moveUp: document.querySelector("#moveUp"),
+      moveDown: document.querySelector("#moveDown"),
+      duplicateSlide: document.querySelector("#duplicateSlide"),
+      deleteSlide: document.querySelector("#deleteSlide"),
     };
+
+    const THEMES = [
+      { id: "warm-tech", name: "暖色技术风", description: "技术文章、教程、知识卡片", swatches: ["#fbf7ee", "#b94b37", "#181817"] },
+      { id: "clean-white", name: "清爽白底", description: "通用笔记、轻量分享", swatches: ["#ffffff", "#2563eb", "#101828"] },
+      { id: "dark-code", name: "深色代码风", description: "代码解析、开发笔记", swatches: ["#121821", "#2dd4bf", "#05070a"] },
+      { id: "mint-editorial", name: "薄荷杂志风", description: "清新知识、生活方式", swatches: ["#f7fbf6", "#277f65", "#102018"] },
+      { id: "tech-black-gold", name: "技术黑金", description: "架构、深度技术、硬核主题", swatches: ["#171511", "#d6ad4f", "#050504"] },
+      { id: "minimal-paper", name: "极简纸感", description: "纯文本、清单、方法论", swatches: ["#fffefa", "#111111", "#f3f3f1"] },
+      { id: "magazine-bold", name: "杂志标题风", description: "观点输出、封面冲击", swatches: ["#fffaf2", "#d72c2c", "#111111"] },
+      { id: "notebook-soft", name: "日系手账", description: "学习笔记、复盘记录", swatches: ["#fbf9f1", "#496991", "#263746"] },
+      { id: "launch-deck", name: "产品发布会风", description: "产品拆解、方案汇报", swatches: ["#f8fbff", "#3b5bdb", "#111827"] },
+      { id: "academic-note", name: "学术笔记风", description: "论文笔记、概念解释", swatches: ["#fbfbf5", "#264653", "#172022"] },
+    ];
 
     let filename = "article.md";
     let currentDeck = null;
@@ -352,6 +520,8 @@
     let busy = false;
     let systemInfo = null;
     let lastError = "";
+    let selectedSlideIndex = 0;
+    let hasManualEdits = false;
 
     function setStatus(message, tone = "neutral") {
       els.status.textContent = message;
@@ -360,6 +530,34 @@
 
     function rememberError(message) {
       lastError = message || "";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function reportForDeck(deck) {
+      return {
+        slideCount: deck?.slides?.length || 0,
+        exceedsXhsLimit: (deck?.slides?.length || 0) > 18,
+      };
+    }
+
+    function setDeckStatus(prefix, deck, tone = "success") {
+      const report = reportForDeck(deck);
+      if (report.exceedsXhsLimit) {
+        setStatus(`${prefix}：共 ${report.slideCount} 张卡片。小红书一次最多发布 18 张图片，建议删除卡片、调大每页字数/块数，或拆成多篇发布。`, "warning");
+      } else {
+        setStatus(`${prefix}：共 ${report.slideCount} 张卡片。`, tone);
+      }
     }
 
     function friendlyError(error) {
@@ -420,6 +618,30 @@
       return json;
     }
 
+    function deckPayload() {
+      return {
+        deck: currentDeck,
+        theme: els.theme.value,
+        outputDir: els.outputDir.value.trim(),
+        chromePath: els.chromePath.value.trim(),
+      };
+    }
+
+    async function renderDeckPreview(deck, statusPrefix = "预览已更新") {
+      const result = await postJsonWithCode("/api/render-deck", {
+        deck,
+        theme: els.theme.value,
+      });
+      currentDeck = result.deck;
+      currentHtml = result.html;
+      selectedSlideIndex = Math.min(selectedSlideIndex, Math.max(0, currentDeck.slides.length - 1));
+      els.frame.srcdoc = makePreviewHtml(currentHtml, currentDeck);
+      renderSlideList();
+      renderSlideEditor();
+      setDeckStatus(statusPrefix, currentDeck);
+      return result;
+    }
+
     async function renderPreview() {
       if (!els.markdown.value.trim()) {
         setStatus("请先选择 Markdown 文件，或粘贴内容。", "error");
@@ -429,12 +651,12 @@
       const result = await postJsonWithCode("/api/render", payload());
       currentDeck = result.deck;
       currentHtml = result.html;
+      selectedSlideIndex = 0;
+      hasManualEdits = false;
       els.frame.srcdoc = makePreviewHtml(currentHtml, currentDeck);
-      if (currentDeck.slides.length > 18) {
-        setStatus(`预览已生成：共 ${currentDeck.slides.length} 张卡片。小红书一次最多发布 18 张图片，建议调大每页字数/块数，或拆成多篇发布。`, "warning");
-      } else {
-        setStatus(`预览已生成：共 ${currentDeck.slides.length} 张卡片。`, "success");
-      }
+      renderSlideList();
+      renderSlideEditor();
+      setDeckStatus("预览已生成", currentDeck);
       return result;
     }
 
@@ -461,17 +683,283 @@
       return html.replace("</head>", `${previewCss}</head>`);
     }
 
+    function renderThemeCards() {
+      els.themeGrid.innerHTML = THEMES.map((theme) => `
+        <button class="theme-card${theme.id === els.theme.value ? " active" : ""}" type="button" data-theme-id="${theme.id}">
+          <span class="theme-name">${escapeHtml(theme.name)}</span>
+          <span class="theme-description">${escapeHtml(theme.description)}</span>
+          <span class="swatches">${theme.swatches.map((color) => `<span style="background:${escapeHtml(color)}"></span>`).join("")}</span>
+        </button>
+      `).join("");
+    }
+
+    async function selectTheme(themeId) {
+      if (busy || els.theme.value === themeId) return;
+      els.theme.value = themeId;
+      renderThemeCards();
+      if (!currentDeck) {
+        setStatus(`已选择主题：${THEMES.find((theme) => theme.id === themeId)?.name || themeId}。`);
+        return;
+      }
+      try {
+        setBusy(true, "正在切换主题", "正在用当前卡片内容刷新预览。");
+        await renderDeckPreview(currentDeck, "主题已切换");
+      } catch (error) {
+        const message = friendlyError(error);
+        rememberError(message);
+        setStatus(message, "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function blockLabel(block) {
+      const labels = {
+        paragraph: "段落",
+        quote: "引用",
+        code: "代码",
+        bullets: "无序列表",
+        steps: "有序列表",
+        table: "表格 JSON",
+        image: "图片",
+        chips: "标签",
+        flow: "流程",
+        pipeline: "管线",
+        roleGrid: "角色网格 JSON",
+        answer: "答案",
+        html: "HTML",
+      };
+      return labels[block?.type] || `未知块：${block?.type || "unknown"}`;
+    }
+
+    function renderBlockEditor(block, index) {
+      const type = block?.type || "paragraph";
+      if (type === "paragraph" || type === "quote") {
+        return `
+          <div class="block-editor" data-block-index="${index}" data-block-type="${type}">
+            <h3>${index + 1}. ${blockLabel(block)}</h3>
+            <textarea data-field="text">${escapeHtml(block.text || "")}</textarea>
+          </div>
+        `;
+      }
+      if (type === "code") {
+        return `
+          <div class="block-editor" data-block-index="${index}" data-block-type="code">
+            <h3>${index + 1}. 代码</h3>
+            <input data-field="lang" value="${escapeHtml(block.lang || "")}" placeholder="语言，例如 js" />
+            <input data-field="caption" value="${escapeHtml(block.caption || "")}" placeholder="说明，可选" />
+            <textarea data-field="source">${escapeHtml(block.source || "")}</textarea>
+          </div>
+        `;
+      }
+      if (type === "bullets" || type === "steps" || type === "chips" || type === "flow" || type === "pipeline") {
+        return `
+          <div class="block-editor" data-block-index="${index}" data-block-type="${type}">
+            <h3>${index + 1}. ${blockLabel(block)}</h3>
+            <textarea data-field="items" placeholder="每行一项">${escapeHtml((block.items || []).join("\n"))}</textarea>
+          </div>
+        `;
+      }
+      if (type === "table" || type === "roleGrid") {
+        return `
+          <div class="block-editor" data-block-index="${index}" data-block-type="${type}">
+            <h3>${index + 1}. ${blockLabel(block)}</h3>
+            <textarea data-field="json">${escapeHtml(JSON.stringify(block, null, 2))}</textarea>
+          </div>
+        `;
+      }
+      if (type === "image") {
+        return `
+          <div class="block-editor" data-block-index="${index}" data-block-type="image">
+            <h3>${index + 1}. 图片</h3>
+            <input data-field="src" value="${escapeHtml(block.src || "")}" placeholder="图片路径" />
+            <input data-field="alt" value="${escapeHtml(block.alt || "")}" placeholder="图片说明" />
+          </div>
+        `;
+      }
+      if (type === "answer") {
+        return `
+          <div class="block-editor" data-block-index="${index}" data-block-type="answer">
+            <h3>${index + 1}. 答案</h3>
+            <input data-field="label" value="${escapeHtml(block.label || "")}" placeholder="标签" />
+            <textarea data-field="text">${escapeHtml(block.text || "")}</textarea>
+          </div>
+        `;
+      }
+      if (type === "html") {
+        return `
+          <div class="block-editor" data-block-index="${index}" data-block-type="html">
+            <h3>${index + 1}. HTML</h3>
+            <textarea data-field="html">${escapeHtml(block.html || "")}</textarea>
+          </div>
+        `;
+      }
+      return `
+        <div class="block-editor" data-block-index="${index}" data-block-type="${escapeHtml(type)}">
+          <h3>${index + 1}. ${blockLabel(block)}</h3>
+          <textarea data-field="json">${escapeHtml(JSON.stringify(block, null, 2))}</textarea>
+        </div>
+      `;
+    }
+
+    function renderSlideList() {
+      if (!currentDeck?.slides?.length) {
+        els.editor.classList.remove("active");
+        els.slideList.innerHTML = "";
+        return;
+      }
+      els.editor.classList.add("active");
+      els.slideList.innerHTML = currentDeck.slides.map((slide, index) => `
+        <button type="button" class="slide-tab${index === selectedSlideIndex ? " active" : ""}" data-slide-index="${index}">
+          ${String(index + 1).padStart(2, "0")} / ${escapeHtml(slide.title || "未命名卡片")}
+        </button>
+      `).join("");
+    }
+
+    function renderSlideEditor() {
+      const slide = currentDeck?.slides?.[selectedSlideIndex];
+      if (!slide) {
+        els.editorFields.innerHTML = "";
+        return;
+      }
+      els.editorFields.innerHTML = `
+        <label>顶部标签<input id="editKicker" value="${escapeHtml(slide.kicker || "")}" /></label>
+        <label>标题<input id="editTitle" value="${escapeHtml(slide.title || "")}" /></label>
+        <label>导语<textarea id="editHero">${escapeHtml(slide.hero || "")}</textarea></label>
+        <label>页脚<input id="editFooter" value="${escapeHtml(slide.footer || "")}" /></label>
+        <div>${(slide.blocks || []).map(renderBlockEditor).join("")}</div>
+      `;
+    }
+
+    function readBlockEditor(node) {
+      const type = node.dataset.blockType;
+      const value = (field) => node.querySelector(`[data-field="${field}"]`)?.value || "";
+      if (type === "paragraph" || type === "quote") return { type, text: value("text") };
+      if (type === "code") {
+        return {
+          type,
+          lang: value("lang") || "text",
+          ...(value("caption") ? { caption: value("caption") } : {}),
+          source: value("source"),
+        };
+      }
+      if (type === "bullets" || type === "steps" || type === "chips" || type === "flow" || type === "pipeline") {
+        return { type, items: value("items").split("\n").map((item) => item.trim()).filter(Boolean) };
+      }
+      if (type === "table" || type === "roleGrid" || node.querySelector('[data-field="json"]')) {
+        try {
+          const parsed = JSON.parse(value("json"));
+          return parsed.type ? parsed : { ...parsed, type };
+        } catch {
+          throw new Error(`${blockLabel({ type })} 格式不是有效 JSON。`);
+        }
+      }
+      if (type === "image") return { type, src: value("src"), alt: value("alt") };
+      if (type === "answer") return { type, label: value("label"), text: value("text") };
+      if (type === "html") return { type, html: value("html") };
+      return { type: "paragraph", text: "" };
+    }
+
+    async function applyEditorChanges() {
+      if (!currentDeck?.slides?.[selectedSlideIndex]) return;
+      const slide = currentDeck.slides[selectedSlideIndex];
+      const nextSlide = {
+        ...slide,
+        kicker: document.querySelector("#editKicker")?.value || "",
+        title: document.querySelector("#editTitle")?.value || "",
+        footer: document.querySelector("#editFooter")?.value || "",
+        blocks: Array.from(document.querySelectorAll(".block-editor")).map(readBlockEditor),
+      };
+      const hero = document.querySelector("#editHero")?.value || "";
+      if (hero.trim()) nextSlide.hero = hero;
+      else delete nextSlide.hero;
+      currentDeck.slides[selectedSlideIndex] = nextSlide;
+      hasManualEdits = true;
+      await renderDeckPreview(currentDeck, "手动修改已应用");
+    }
+
     els.file.addEventListener("change", async () => {
       if (busy) return;
       const file = els.file.files[0];
       if (!file) return;
       filename = file.name;
       els.markdown.value = await file.text();
+      currentDeck = null;
+      currentHtml = "";
+      hasManualEdits = false;
+      selectedSlideIndex = 0;
+      renderSlideList();
+      renderSlideEditor();
       setStatus(`已读取 ${file.name}。`);
+    });
+
+    els.themeGrid.addEventListener("click", async (event) => {
+      const card = event.target.closest("[data-theme-id]");
+      if (!card) return;
+      await selectTheme(card.dataset.themeId);
+    });
+
+    els.slideList.addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-slide-index]");
+      if (!tab || busy) return;
+      selectedSlideIndex = Number(tab.dataset.slideIndex);
+      renderSlideList();
+      renderSlideEditor();
+    });
+
+    els.applyEditor.addEventListener("click", async () => {
+      if (busy) return;
+      try {
+        setBusy(true, "正在应用修改", "正在刷新当前卡片预览。");
+        await applyEditorChanges();
+      } catch (error) {
+        const message = friendlyError(error);
+        rememberError(message);
+        setStatus(message, "error");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    els.moveUp.addEventListener("click", async () => {
+      if (busy || !currentDeck || selectedSlideIndex <= 0) return;
+      [currentDeck.slides[selectedSlideIndex - 1], currentDeck.slides[selectedSlideIndex]] = [currentDeck.slides[selectedSlideIndex], currentDeck.slides[selectedSlideIndex - 1]];
+      selectedSlideIndex -= 1;
+      hasManualEdits = true;
+      await renderDeckPreview(currentDeck, "卡片已上移");
+    });
+
+    els.moveDown.addEventListener("click", async () => {
+      if (busy || !currentDeck || selectedSlideIndex >= currentDeck.slides.length - 1) return;
+      [currentDeck.slides[selectedSlideIndex + 1], currentDeck.slides[selectedSlideIndex]] = [currentDeck.slides[selectedSlideIndex], currentDeck.slides[selectedSlideIndex + 1]];
+      selectedSlideIndex += 1;
+      hasManualEdits = true;
+      await renderDeckPreview(currentDeck, "卡片已下移");
+    });
+
+    els.duplicateSlide.addEventListener("click", async () => {
+      if (busy || !currentDeck?.slides?.[selectedSlideIndex]) return;
+      currentDeck.slides.splice(selectedSlideIndex + 1, 0, clone(currentDeck.slides[selectedSlideIndex]));
+      selectedSlideIndex += 1;
+      hasManualEdits = true;
+      await renderDeckPreview(currentDeck, "卡片已复制");
+    });
+
+    els.deleteSlide.addEventListener("click", async () => {
+      if (busy || !currentDeck?.slides?.length) return;
+      if (currentDeck.slides.length === 1) {
+        setStatus("至少需要保留一张卡片。", "warning");
+        return;
+      }
+      currentDeck.slides.splice(selectedSlideIndex, 1);
+      selectedSlideIndex = Math.min(selectedSlideIndex, currentDeck.slides.length - 1);
+      hasManualEdits = true;
+      await renderDeckPreview(currentDeck, "卡片已删除");
     });
 
     els.preview.addEventListener("click", async () => {
       if (busy) return;
+      if (hasManualEdits && !window.confirm("重新从 Markdown 生成会覆盖当前手动修改，确定继续吗？")) return;
       try {
         setBusy(true, "正在生成预览", "正在解析 Markdown 并生成卡片预览。");
         await renderPreview();
@@ -487,13 +975,21 @@
     els.save.addEventListener("click", async () => {
       if (busy) return;
       try {
-        if (!els.markdown.value.trim()) {
+        if (!currentDeck && !els.markdown.value.trim()) {
           setStatus("请先选择 Markdown 文件，或粘贴内容。", "error");
           return;
         }
         setBusy(true, "正在保存文件", "正在检查分页并写入 HTML/JSON。");
         setStatus("正在保存预览文件...");
-        const result = await postJsonWithCode("/api/save", payload());
+        const result = currentDeck
+          ? await postJsonWithCode("/api/save-deck", deckPayload())
+          : await postJsonWithCode("/api/save", payload());
+        if (currentDeck) {
+          currentDeck = result.deck;
+          currentHtml = result.html || currentHtml;
+          renderSlideList();
+          renderSlideEditor();
+        }
         await postJsonWithCode("/api/open", { path: result.outputDir });
         if (result.report?.exceedsXhsLimit) {
           setStatus(`已保存到 ${result.outputDir}。当前共 ${result.report.slideCount} 张，超过小红书单次 18 张上限。`, "warning");
@@ -516,7 +1012,10 @@
         if (!currentDeck) await renderPreview();
         if (!currentDeck) return;
         setStatus("正在调用本地 Chrome/Edge 导出 PNG...");
-        const result = await postJsonWithCode("/api/export-png", payload());
+        const result = await postJsonWithCode("/api/export-deck-png", deckPayload());
+        currentDeck = result.deck;
+        renderSlideList();
+        renderSlideEditor();
         const overflowPages = result.report?.overflowPages || result.overflowReport.filter((item) => item.hasOverflow).map((item) => item.index);
         await postJsonWithCode("/api/open", { path: result.outputDir });
         const warnings = [];
@@ -581,6 +1080,8 @@
         window.prompt("复制下面的诊断信息：", text);
       }
     });
+
+    renderThemeCards();
 
     fetch("/api/system")
       .then((res) => res.json())
