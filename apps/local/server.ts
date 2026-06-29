@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -15,6 +15,16 @@ import {
 const PORT = Number(process.env.XHS_CARDGEN_PORT || 4927);
 const IS_WIN = process.platform === "win32";
 const DEFAULT_OUTPUT = path.join(os.homedir(), "Desktop", "xhs-cardgen-exports");
+const APP_VERSION = "0.1.0";
+
+class AppError extends Error {
+  code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
 
 type RenderPayload = {
   markdown?: string;
@@ -61,9 +71,20 @@ function sanitizeName(value: string) {
   return value.replace(/[<>:"/\\|?*\x00-\x1f]/g, "-").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "cards";
 }
 
+function ensureWritableDirectory(outputDir: string) {
+  try {
+    mkdirSync(outputDir, { recursive: true });
+    const testPath = path.join(outputDir, `.xhs-cardgen-write-test-${Date.now()}`);
+    writeFileSync(testPath, "ok", "utf8");
+    unlinkSync(testPath);
+  } catch {
+    throw new AppError("OUTPUT_DIR_NOT_WRITABLE", "输出文件夹不可写，请换一个有权限的文件夹。");
+  }
+}
+
 function createDeckFromMarkdown(payload: RenderPayload) {
   const markdown = payload.markdown || "";
-  if (!markdown.trim()) throw new Error("Markdown content is empty.");
+  if (!markdown.trim()) throw new AppError("EMPTY_MARKDOWN", "请先选择 Markdown 文件，或粘贴内容。");
 
   const document = parseMarkdown(markdown);
   const limits = {
@@ -119,7 +140,7 @@ async function saveProject(payload: SavePayload) {
   const baseName = sanitizeName(deck.title || path.basename(payload.filename || "cards"));
   const outputDir = payload.outputDir?.trim() || path.join(DEFAULT_OUTPUT, `${baseName}-${stamp}`);
 
-  mkdirSync(outputDir, { recursive: true });
+  ensureWritableDirectory(outputDir);
   writeFileSync(path.join(outputDir, "slides.json"), `${JSON.stringify(deck, null, 2)}\n`, "utf8");
   writeFileSync(path.join(outputDir, "preview.html"), html, "utf8");
 
@@ -139,7 +160,7 @@ async function exportProject(payload: SavePayload) {
   const outputDir = payload.outputDir?.trim() || path.join(DEFAULT_OUTPUT, `${baseName}-${stamp}`);
   const cardsDir = path.join(outputDir, "cards");
 
-  mkdirSync(outputDir, { recursive: true });
+  ensureWritableDirectory(outputDir);
   writeFileSync(path.join(outputDir, "slides.json"), `${JSON.stringify(deck, null, 2)}\n`, "utf8");
   writeFileSync(path.join(outputDir, "preview.html"), html, "utf8");
 
@@ -194,6 +215,9 @@ Bun.serve({
 
       if (url.pathname === "/api/system" && req.method === "GET") {
         return json({
+          version: APP_VERSION,
+          platform: process.platform,
+          arch: process.arch,
           defaultOutput: DEFAULT_OUTPUT,
           chromePath: findSystemChrome(""),
           port: PORT,
@@ -209,7 +233,14 @@ Bun.serve({
 
       return json({ error: "Not found" }, { status: 404 });
     } catch (error) {
-      return json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const code =
+        error instanceof AppError
+          ? error.code
+          : message.includes("Chrome or Edge was not found")
+            ? "CHROME_NOT_FOUND"
+            : "UNKNOWN";
+      return json({ error: message, code }, { status: 500 });
     }
   },
 });

@@ -27,6 +27,24 @@ npm run local:build
 
 See [docs/local-app-release.md](./docs/local-app-release.md) for macOS and Windows release notes.
 
+## Local App FAQ
+
+**macOS 提示无法打开怎么办？**
+
+当前 release 包未做 Apple notarization。首次打开时可以右键点击 `XHS Cardgen.app`，选择“打开”，再在系统提示中确认打开。
+
+**Windows 出现 SmartScreen 提示怎么办？**
+
+当前 Windows 包未做代码签名。首次运行 `start.bat` 时，如果看到 SmartScreen，可以选择“更多信息”，再选择“仍要运行”。
+
+**为什么导出 PNG 需要 Chrome 或 Edge？**
+
+为了让下载包保持轻量，桌面工具没有内置浏览器。PNG 导出会调用你电脑里已安装的 Chrome、Edge 或 Chromium 在本地截图；如果自动检测失败，可以在页面里手动填写浏览器路径。
+
+**这个工具会调用 LLM 吗？**
+
+不会。当前版本只使用本地规则解析 Markdown、分页并生成卡片，不会把文章内容发送给大模型。
+
 ## CLI Quick Start
 
 ## Current Workflow

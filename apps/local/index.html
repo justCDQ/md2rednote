@@ -134,6 +134,48 @@
       font-size: 12px;
       line-height: 1.45;
     }
+    .system-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid rgba(23, 23, 20, 0.14);
+      border-radius: 8px;
+      background: #fffaf0;
+    }
+    .system-card h2 {
+      margin: 0;
+      color: #171714;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .system-grid {
+      display: grid;
+      gap: 7px;
+    }
+    .system-row {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      color: #62584c;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .system-row b {
+      color: #8a8176;
+      font-weight: 750;
+    }
+    .system-row span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .system-ok { color: #2f6a36; font-weight: 800; }
+    .system-warn { color: #9b3f30; font-weight: 800; }
+    .secondary {
+      height: 36px;
+      background: #fffdf8;
+      font-size: 13px;
+    }
     select {
       width: 100%;
       height: 40px;
@@ -244,6 +286,18 @@
       <p class="hint">PNG 导出由本地服务调用系统 Chrome 或 Edge 完成，文件会直接写入输出文件夹。</p>
       <p class="hint">当前版本只使用规则解析和分页，不会调用 LLM 大模型改写或筛选内容。</p>
 
+      <section class="system-card" aria-label="环境检测">
+        <h2>环境检测</h2>
+        <div class="system-grid">
+          <div class="system-row"><b>版本</b><span id="systemVersion">检测中...</span></div>
+          <div class="system-row"><b>系统</b><span id="systemPlatform">检测中...</span></div>
+          <div class="system-row"><b>端口</b><span id="systemPort">检测中...</span></div>
+          <div class="system-row"><b>默认输出</b><span id="systemOutput">检测中...</span></div>
+          <div class="system-row"><b>浏览器</b><span id="systemChrome">检测中...</span></div>
+        </div>
+        <button id="copyDiagnostics" class="secondary" type="button">复制诊断信息</button>
+      </section>
+
       <div class="actions">
         <button id="preview">预览</button>
         <button id="save">保存 HTML/JSON</button>
@@ -284,16 +338,46 @@
       busyOverlay: document.querySelector("#busyOverlay"),
       busyTitle: document.querySelector("#busyTitle"),
       busyText: document.querySelector("#busyText"),
+      systemVersion: document.querySelector("#systemVersion"),
+      systemPlatform: document.querySelector("#systemPlatform"),
+      systemPort: document.querySelector("#systemPort"),
+      systemOutput: document.querySelector("#systemOutput"),
+      systemChrome: document.querySelector("#systemChrome"),
+      copyDiagnostics: document.querySelector("#copyDiagnostics"),
     };
 
     let filename = "article.md";
     let currentDeck = null;
     let currentHtml = "";
     let busy = false;
+    let systemInfo = null;
+    let lastError = "";
 
     function setStatus(message, tone = "neutral") {
       els.status.textContent = message;
       els.status.dataset.tone = tone;
+    }
+
+    function rememberError(message) {
+      lastError = message || "";
+    }
+
+    function friendlyError(error) {
+      const code = error?.code || "";
+      const message = error?.message || String(error || "未知错误");
+      if (code === "EMPTY_MARKDOWN" || message.includes("Markdown content is empty")) {
+        return "请先选择 Markdown 文件，或粘贴内容。";
+      }
+      if (code === "CHROME_NOT_FOUND" || message.includes("Chrome or Edge was not found")) {
+        return "没有检测到 Chrome/Edge。请先安装 Chrome 或 Edge，或在上方填写浏览器可执行文件路径。";
+      }
+      if (code === "OUTPUT_DIR_NOT_WRITABLE") {
+        return "输出文件夹不可写，请换一个有权限的文件夹。";
+      }
+      if (message.includes("Failed to create Chrome target") || message.includes("Timed out waiting for Chrome DevTools")) {
+        return "无法启动本地 Chrome/Edge 截图服务。请确认浏览器路径正确，或关闭浏览器后重试。";
+      }
+      return message;
     }
 
     function setBusy(value, title = "正在处理", text = "请稍候，当前操作完成前暂时不能编辑或重复点击。") {
@@ -321,14 +405,18 @@
       };
     }
 
-    async function postJson(url, data) {
+    async function postJsonWithCode(url, data) {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || "Request failed.");
+      if (!res.ok || json.error) {
+        const error = new Error(json.error || "Request failed.");
+        error.code = json.code || "";
+        throw error;
+      }
       return json;
     }
 
@@ -338,7 +426,7 @@
         return null;
       }
       setStatus("正在生成预览...");
-      const result = await postJson("/api/render", payload());
+      const result = await postJsonWithCode("/api/render", payload());
       currentDeck = result.deck;
       currentHtml = result.html;
       els.frame.srcdoc = makePreviewHtml(currentHtml, currentDeck);
@@ -388,7 +476,9 @@
         setBusy(true, "正在生成预览", "正在解析 Markdown 并生成卡片预览。");
         await renderPreview();
       } catch (error) {
-        setStatus(error.message, "error");
+        const message = friendlyError(error);
+        rememberError(message);
+        setStatus(message, "error");
       } finally {
         setBusy(false);
       }
@@ -403,15 +493,17 @@
         }
         setBusy(true, "正在保存文件", "正在检查分页并写入 HTML/JSON。");
         setStatus("正在保存预览文件...");
-        const result = await postJson("/api/save", payload());
-        await postJson("/api/open", { path: result.outputDir });
+        const result = await postJsonWithCode("/api/save", payload());
+        await postJsonWithCode("/api/open", { path: result.outputDir });
         if (result.report?.exceedsXhsLimit) {
           setStatus(`已保存到 ${result.outputDir}。当前共 ${result.report.slideCount} 张，超过小红书单次 18 张上限。`, "warning");
         } else {
           setStatus(`已保存到 ${result.outputDir}`, "success");
         }
       } catch (error) {
-        setStatus(error.message, "error");
+        const message = friendlyError(error);
+        rememberError(message);
+        setStatus(message, "error");
       } finally {
         setBusy(false);
       }
@@ -424,9 +516,9 @@
         if (!currentDeck) await renderPreview();
         if (!currentDeck) return;
         setStatus("正在调用本地 Chrome/Edge 导出 PNG...");
-        const result = await postJson("/api/export-png", payload());
+        const result = await postJsonWithCode("/api/export-png", payload());
         const overflowPages = result.report?.overflowPages || result.overflowReport.filter((item) => item.hasOverflow).map((item) => item.index);
-        await postJson("/api/open", { path: result.outputDir });
+        await postJsonWithCode("/api/open", { path: result.outputDir });
         const warnings = [];
         if (result.report?.exceedsXhsLimit) {
           warnings.push(`共 ${result.report.slideCount} 张，超过小红书单次 18 张上限`);
@@ -441,22 +533,71 @@
           warnings.length ? "warning" : "success",
         );
       } catch (error) {
-        setStatus(error.message, "error");
+        const message = friendlyError(error);
+        rememberError(message);
+        setStatus(message, "error");
       } finally {
         setBusy(false);
+      }
+    });
+
+    function updateSystemInfo(system) {
+      systemInfo = system;
+      els.systemVersion.textContent = system.version || "未知";
+      els.systemPlatform.textContent = `${system.platform || "unknown"} / ${system.arch || "unknown"}`;
+      els.systemPort.textContent = system.port ? String(system.port) : "未知";
+      els.systemOutput.textContent = system.defaultOutput || "未获取";
+      if (system.chromePath) {
+        els.systemChrome.textContent = `已检测到：${system.chromePath}`;
+        els.systemChrome.className = "system-ok";
+      } else {
+        els.systemChrome.textContent = "未检测到，请安装 Chrome/Edge 或手动填写路径";
+        els.systemChrome.className = "system-warn";
+      }
+    }
+
+    function diagnosticsText() {
+      const data = payload();
+      return [
+        "md2rednote 诊断信息",
+        `版本: ${systemInfo?.version || "unknown"}`,
+        `系统: ${systemInfo?.platform || "unknown"} / ${systemInfo?.arch || "unknown"}`,
+        `端口: ${systemInfo?.port || "unknown"}`,
+        `默认输出目录: ${systemInfo?.defaultOutput || "unknown"}`,
+        `当前输出目录: ${data.outputDir || systemInfo?.defaultOutput || "default"}`,
+        `检测到的 Chrome/Edge: ${systemInfo?.chromePath || "未检测到"}`,
+        `当前 Chrome/Edge 路径: ${data.chromePath || "留空"}`,
+        `最近一次错误: ${lastError || "无"}`,
+      ].join("\\n");
+    }
+
+    els.copyDiagnostics.addEventListener("click", async () => {
+      if (busy) return;
+      const text = diagnosticsText();
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("诊断信息已复制，可以粘贴到 GitHub issue。", "success");
+      } catch {
+        window.prompt("复制下面的诊断信息：", text);
       }
     });
 
     fetch("/api/system")
       .then((res) => res.json())
       .then((system) => {
+        updateSystemInfo(system);
         if (system.defaultOutput) els.outputDir.placeholder = system.defaultOutput;
         if (system.chromePath) {
           els.chromePath.value = system.chromePath;
           setStatus("已检测到 Chrome/Edge，准备就绪。");
+        } else {
+          setStatus("未检测到 Chrome/Edge。可以先安装浏览器，或手动填写浏览器路径。", "warning");
         }
       })
-      .catch(() => {});
+      .catch((error) => {
+        rememberError(error.message);
+        setStatus("环境检测失败，请刷新页面重试。", "warning");
+      });
   </script>
 </body>
 </html>
