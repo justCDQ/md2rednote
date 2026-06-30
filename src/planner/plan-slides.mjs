@@ -3,7 +3,7 @@ import { splitBlock } from "./split-blocks.mjs";
 
 export function blockWeight(block) {
   if (!block) return 0;
-  if (block.type === "paragraph" || block.type === "quote") return block.text.length;
+  if (block.type === "paragraph" || block.type === "quote" || block.type === "subheading") return block.text.length;
   if (block.type === "bullets" || block.type === "steps") return block.items.join("").length + block.items.length * 12;
   if (block.type === "code") return block.source.length * 1.2;
   if (block.type === "table") return JSON.stringify(block.headers).length + JSON.stringify(block.rows).length;
@@ -117,6 +117,16 @@ function sectionKicker(level) {
   return "Note";
 }
 
+function shouldContinueWithSubheading(current, currentHeadingLevel, heading, limits) {
+  if (!current || current.blocks.length === 0) return false;
+  if (!currentHeadingLevel || heading.level <= currentHeadingLevel) return false;
+  if (current.blocks.length >= Math.max(1, limits.maxBlocksPerSlide - 1)) return false;
+
+  const headingWeight = normalizeTitle(heading.text).length + 24;
+  const allowedWeight = limits.maxCharactersPerSlide * 0.62;
+  return slideWeight(current) + headingWeight <= allowedWeight;
+}
+
 export function planSlides(document, options = {}) {
   const limits = {
     ...DEFAULT_LIMITS,
@@ -127,14 +137,16 @@ export function planSlides(document, options = {}) {
   let current = null;
   let currentTitle = title;
   let currentKicker = "Markdown";
+  let currentHeadingLevel = 0;
 
-  const startSlide = ({ kicker, slideTitle, type } = {}) => {
+  const startSlide = ({ kicker, slideTitle, type, headingLevel } = {}) => {
     current = createSlide({
       type,
       kicker: kicker || currentKicker,
       title: slideTitle || currentTitle,
       blocks: [],
     });
+    currentHeadingLevel = headingLevel || currentHeadingLevel;
     slides.push(current);
   };
 
@@ -143,12 +155,24 @@ export function planSlides(document, options = {}) {
 
     for (const block of blocks) {
     if (block.type === "heading") {
-      currentTitle = normalizeTitle(block.text);
-      currentKicker = sectionKicker(block.level);
+      const headingTitle = normalizeTitle(block.text);
+      const headingKicker = sectionKicker(block.level);
+
+      if (shouldContinueWithSubheading(current, currentHeadingLevel, block, limits)) {
+        current.blocks.push({ type: "subheading", text: headingTitle, level: block.level });
+        currentTitle = headingTitle;
+        currentKicker = headingKicker;
+        currentHeadingLevel = block.level;
+        continue;
+      }
+
+      currentTitle = headingTitle;
+      currentKicker = headingKicker;
       startSlide({
         kicker: block.level === 1 ? "Overview" : currentKicker,
         slideTitle: currentTitle,
         type: block.level === 1 && slides.length === 0 ? "cover" : undefined,
+        headingLevel: block.level,
       });
       continue;
     }

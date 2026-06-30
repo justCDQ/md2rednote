@@ -23,6 +23,32 @@ if (!html.includes("class=\"card")) {
   throw new Error("Expected rendered HTML to contain card markup.");
 }
 
+const nestedHeadingMarkdown = `## 第二部分：tj/co 源码逐段剖析
+
+tj/co 的核心文件 \`index.js\` 总共两百多行，有两个主要差异。
+
+#### 入口：co 函数本身
+
+\`\`\`js
+function co(gen) {
+  return new Promise(function(resolve) {
+    resolve(gen);
+  });
+}
+\`\`\`
+`;
+const nestedDeck = planSlides(parseMarkdown(nestedHeadingMarkdown), {});
+const firstNestedSlide = nestedDeck.slides[0];
+if (nestedDeck.slides.length !== 1) {
+  throw new Error("Expected sparse parent heading and first child heading to share one slide.");
+}
+if (!firstNestedSlide.blocks.some((block) => block.type === "subheading" && block.text.includes("入口：co 函数本身"))) {
+  throw new Error("Expected continued child heading to be rendered as a block on the parent slide.");
+}
+if ("headingLevel" in firstNestedSlide) {
+  throw new Error("Planner internal heading metadata must not leak into slides.json.");
+}
+
 await rm(tempOut, { recursive: true, force: true });
 const result = await buildFromMarkdown({
   input: example,

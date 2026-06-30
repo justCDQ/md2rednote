@@ -2,10 +2,14 @@
 set -e
 
 APP_NAME="XHS Cardgen"
+PACKAGE_NAME="md2rednote"
+VERSION="$(node -p "require('./package.json').version")"
 BIN_NAME="xhs-cardgen-local"
 PORT="4927"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="${ROOT}/dist-local"
+MAC_ZIP="${DIST}/${PACKAGE_NAME}-v${VERSION}-macos-arm64.zip"
+WIN_ZIP="${DIST}/${PACKAGE_NAME}-v${VERSION}-windows-x64.zip"
 APP_DIR="${DIST}/${APP_NAME}.app"
 CONTENTS="${APP_DIR}/Contents"
 MACOS="${CONTENTS}/MacOS"
@@ -21,6 +25,8 @@ rm -rf "${APP_DIR}"
 mkdir -p "${MACOS}" "${RESOURCES}"
 cp "${DIST}/${BIN_NAME}" "${MACOS}/"
 cp "${ROOT}/apps/local/index.html" "${RESOURCES}/"
+cp "${ROOT}/apps/local/"*.js "${RESOURCES}/"
+cp "${ROOT}/apps/local/"*.css "${RESOURCES}/"
 
 cat > "${MACOS}/launch" << LAUNCHER
 #!/bin/bash
@@ -81,7 +87,8 @@ PLIST
 rm -f "${DIST}/${BIN_NAME}"
 
 cd "${DIST}"
-ditto -c -k --sequesterRsrc --keepParent "${APP_NAME}.app" "${APP_NAME}-mac.zip"
+rm -f "${MAC_ZIP}" "${APP_NAME}-mac.zip"
+ditto -c -k --sequesterRsrc --keepParent "${APP_NAME}.app" "${MAC_ZIP}"
 cd "${ROOT}"
 
 echo "Building Windows portable package..."
@@ -91,6 +98,8 @@ mkdir -p "${WIN_DIR}"
 
 bun build --compile --target=bun-windows-x64 "${ROOT}/apps/local/server.ts" --outfile "${WIN_DIR}/${BIN_NAME}.exe"
 cp "${ROOT}/apps/local/index.html" "${WIN_DIR}/"
+cp "${ROOT}/apps/local/"*.js "${WIN_DIR}/"
+cp "${ROOT}/apps/local/"*.css "${WIN_DIR}/"
 
 cat > "${WIN_DIR}/start.bat" << BAT
 @echo off
@@ -105,10 +114,11 @@ start http://localhost:${PORT}/
 BAT
 
 cd "${DIST}"
-zip -r "${APP_NAME}-win.zip" "${APP_NAME}-win/"
+rm -f "${WIN_ZIP}" "${APP_NAME}-win.zip"
+zip -r "${WIN_ZIP}" "${APP_NAME}-win/"
 cd "${ROOT}"
 rm -rf "${WIN_DIR}"
 
 echo "Done:"
-echo "  macOS:   ${DIST}/${APP_NAME}-mac.zip"
-echo "  Windows: ${DIST}/${APP_NAME}-win.zip"
+echo "  macOS:   ${MAC_ZIP}"
+echo "  Windows: ${WIN_ZIP}"

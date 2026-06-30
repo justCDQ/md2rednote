@@ -16,6 +16,11 @@ const PORT = Number(process.env.XHS_CARDGEN_PORT || 4927);
 const IS_WIN = process.platform === "win32";
 const DEFAULT_OUTPUT = path.join(os.homedir(), "Desktop", "xhs-cardgen-exports");
 const APP_VERSION = "0.1.0";
+const STATIC_TYPES: Record<string, string> = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+};
 
 class AppError extends Error {
   code: string;
@@ -58,6 +63,17 @@ function findStaticFile(name: string): string {
 
   const found = candidates.find((candidate) => existsSync(candidate));
   return found ? readFileSync(found, "utf8") : "";
+}
+
+function staticResponse(name: string) {
+  const content = findStaticFile(name);
+  if (!content) return null;
+  return new Response(content, {
+    headers: {
+      "Content-Type": STATIC_TYPES[path.extname(name)] || "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 function openBrowser(url: string) {
@@ -267,6 +283,14 @@ Bun.serve({
         return new Response(INDEX_HTML, {
           headers: { "Content-Type": "text/html; charset=utf-8" },
         });
+      }
+
+      if (req.method === "GET") {
+        const staticName = decodeURIComponent(url.pathname.replace(/^\//, ""));
+        if (/^[\w.-]+\.(css|js)$/.test(staticName)) {
+          const response = staticResponse(staticName);
+          if (response) return response;
+        }
       }
 
       if (url.pathname === "/api/render" && req.method === "POST") {

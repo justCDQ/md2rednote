@@ -5,6 +5,10 @@ function renderParagraph(block) {
   return `<p>${inlineMarkdown(block.text)}</p>`;
 }
 
+function renderSubheading(block) {
+  return `<h2 class="subheading">${inlineMarkdown(block.text)}</h2>`;
+}
+
 function renderList(tag, items) {
   return `<${tag}>${items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</${tag}>`;
 }
@@ -78,6 +82,8 @@ function renderAnswer(block) {
 
 export function renderBlock(block) {
   switch (block.type) {
+    case "subheading":
+      return renderSubheading(block);
     case "paragraph":
       return renderParagraph(block);
     case "bullets":

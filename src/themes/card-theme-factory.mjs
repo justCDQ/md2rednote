@@ -112,6 +112,24 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
       letter-spacing: 0;
       overflow-wrap: anywhere;
     }
+    .subheading {
+      margin: 14px 0 0;
+      color: ${p.text};
+      font-size: 44px;
+      line-height: 1.22;
+      letter-spacing: 0;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+    .subheading::before {
+      content: "";
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      margin-right: 14px;
+      background: ${p.accent};
+      vertical-align: 0.12em;
+    }
     strong { color: ${p.text}; font-weight: 850; }
     em { font-style: normal; color: ${p.accent}; font-weight: 800; }
     code.inline {

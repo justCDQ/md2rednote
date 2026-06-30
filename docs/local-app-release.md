@@ -43,9 +43,33 @@ Outputs:
 
 ```text
 dist-local/
-  XHS Cardgen-mac.zip
-  XHS Cardgen-win.zip
+  md2rednote-v0.1.0-macos-arm64.zip
+  md2rednote-v0.1.0-windows-x64.zip
 ```
+
+Artifact names are derived from `package.json` version. For example, version `0.1.1` produces:
+
+```text
+md2rednote-v0.1.1-macos-arm64.zip
+md2rednote-v0.1.1-windows-x64.zip
+```
+
+## Pre-release Check
+
+Before creating a GitHub release, run:
+
+```bash
+npm run release:check
+```
+
+This command runs:
+
+- `npm run check`
+- Bun local server compilation
+- `npm run local:build`
+- release artifact existence checks
+
+Keep `CHANGELOG.md` updated before publishing a release.
 
 ## macOS Package
 
@@ -114,10 +138,19 @@ You can copy this FAQ into GitHub release notes:
 
 ## Release Checklist
 
-- [ ] `npm run check`
+- [ ] `CHANGELOG.md` updated
+- [ ] `package.json` version confirmed
+- [ ] `npm run release:check`
 - [ ] `npm run local:dev`
 - [ ] preview a Markdown file
 - [ ] export PNGs with system Chrome/Edge
-- [ ] `npm run local:build`
 - [ ] test macOS zip on a clean machine, if releasing Mac
 - [ ] test Windows zip on a Windows machine, if releasing Windows
+- [ ] GitHub release notes written
+- [ ] upload versioned zip artifacts from `dist-local/`
+
+## GitHub Actions
+
+GitHub Actions should be added after the repository token has the `workflow` scope. The first workflow should run core checks and compile the local server for pushes to `main` and pull requests.
+
+Release artifact uploading is intentionally kept manual for now because desktop signing, notarization, and cross-platform verification still need human review.

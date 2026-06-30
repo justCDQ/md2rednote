@@ -19,7 +19,8 @@
     "example": "node ./bin/xhs-cardgen.mjs build ./examples/event-loop-mini.md --out ./dist/event-loop-mini",
     "check": "node ./scripts/check.mjs",
     "local:dev": "bun run apps/local/server.ts",
-    "local:build": "bash build/create-local-app.sh"
+    "local:build": "bash build/create-local-app.sh",
+    "release:check": "node ./scripts/release-check.mjs"
   },
   "keywords": [
     "markdown",

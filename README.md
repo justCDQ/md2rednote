@@ -25,6 +25,12 @@ Build distributable packages:
 npm run local:build
 ```
 
+Run the pre-release checklist:
+
+```bash
+npm run release:check
+```
+
 See [docs/local-app-release.md](./docs/local-app-release.md) for macOS and Windows release notes.
 
 ## Local App FAQ
