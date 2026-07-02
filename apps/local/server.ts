@@ -10,7 +10,9 @@ import { renderDeckHtml } from "../../src/render/render-deck-html.mjs";
 import {
   exportPngCardsWithSystemChrome,
   findSystemChrome,
+  measureHtmlOverflowWithSystemChrome,
 } from "../../src/export/chrome-headless-export.mjs";
+import { repairOverflowPages } from "../../src/workflow/repair-overflow.mjs";
 
 const PORT = Number(process.env.XHS_CARDGEN_PORT || 4927);
 const IS_WIN = process.platform === "win32";
@@ -120,6 +122,7 @@ function createDeckFromMarkdown(payload: RenderPayload) {
     brand: payload.brand || undefined,
     source: payload.filename || "browser-import",
     limits,
+    theme: payload.theme || "warm-tech",
   });
   const html = renderDeckHtml(deck, { theme: payload.theme || "warm-tech" });
   return { deck, html, document, limits };
@@ -136,6 +139,33 @@ function createReport(deck: any, overflowReport: Array<{ index: number; hasOverf
     exceedsXhsLimit: deck.slides.length > 18,
     xhsLimit: 18,
     overflowPages,
+  };
+}
+
+async function repairDeckBeforeExport(deck: any, theme: string, chromePath?: string) {
+  let currentDeck = deck;
+  let currentHtml = renderDeckHtml(currentDeck, { theme });
+  let overflowReport: Array<{ index: number; hasOverflow: boolean }> = [];
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const measured = await measureHtmlOverflowWithSystemChrome({
+      html: currentHtml,
+      deck: currentDeck,
+      chromePath,
+    });
+    overflowReport = measured.overflowReport;
+    if (!hasOverflow(overflowReport)) break;
+    if (attempt === 2) break;
+    const repaired = repairOverflowPages(currentDeck, overflowReport);
+    if (JSON.stringify(repaired.slides) === JSON.stringify(currentDeck.slides)) break;
+    currentDeck = repaired;
+    currentHtml = renderDeckHtml(currentDeck, { theme });
+  }
+
+  return {
+    deck: currentDeck,
+    html: currentHtml,
+    overflowReport,
   };
 }
 
@@ -209,13 +239,17 @@ async function saveDeckProject(payload: DeckPayload) {
 }
 
 async function exportProject(payload: SavePayload) {
-  const { deck, html } = createDeckFromMarkdown(payload);
+  const generated = createDeckFromMarkdown(payload);
+  const theme = payload.theme || "warm-tech";
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const baseName = sanitizeName(deck.title || path.basename(payload.filename || "cards"));
+  const baseName = sanitizeName(generated.deck.title || path.basename(payload.filename || "cards"));
   const outputDir = payload.outputDir?.trim() || path.join(DEFAULT_OUTPUT, `${baseName}-${stamp}`);
   const cardsDir = path.join(outputDir, "cards");
 
   ensureWritableDirectory(outputDir);
+  const repaired = await repairDeckBeforeExport(generated.deck, theme, payload.chromePath);
+  const deck = repaired.deck;
+  const html = repaired.html;
   writeFileSync(path.join(outputDir, "slides.json"), `${JSON.stringify(deck, null, 2)}\n`, "utf8");
   writeFileSync(path.join(outputDir, "preview.html"), html, "utf8");
 
@@ -234,8 +268,8 @@ async function exportProject(payload: SavePayload) {
     slidesPath: path.join(outputDir, "slides.json"),
     previewPath: path.join(outputDir, "preview.html"),
     files: exportResult.files,
-    overflowReport: exportResult.overflowReport,
-    report: createReport(deck, exportResult.overflowReport),
+    overflowReport: repaired.overflowReport,
+    report: createReport(deck, repaired.overflowReport),
     chromePath: exportResult.chromePath,
   };
 }
@@ -255,6 +289,7 @@ async function exportDeckProject(payload: DeckPayload) {
     outDir: cardsDir,
     chromePath: payload.chromePath,
     theme: payload.theme || "warm-tech",
+    includeOverflowReport: true,
   });
 
   return {

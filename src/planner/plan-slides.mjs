@@ -1,4 +1,6 @@
 import { createDeck, createSlide, DEFAULT_LIMITS } from "../core/schema.mjs";
+import { getThemeLayoutMetrics } from "../themes/theme-registry.mjs";
+import { estimateBlockHeight, estimateSlideUsage } from "./estimate-slide-height.mjs";
 import { splitBlock } from "./split-blocks.mjs";
 
 export function blockWeight(block) {
@@ -46,16 +48,45 @@ export function refreshSlideFooters(deck) {
   };
 }
 
-function canMergeSlides(left, right, limits) {
+function getSlideUsage(slide, context) {
+  return estimateSlideUsage(slide, {
+    width: context.width,
+    height: context.height,
+    metrics: context.metrics,
+  });
+}
+
+function canFitBlock(slide, block, context, { allowExtraBlock = false } = {}) {
+  if (!slide) return false;
+  const blockLimit = allowExtraBlock ? context.limits.maxBlocksPerSlide + 1 : context.limits.maxBlocksPerSlide;
+  if (slide.blocks.length >= blockLimit) return false;
+
+  const currentUsage = getSlideUsage(slide, context);
+  const blockHeight = estimateBlockHeight(block, {
+    metrics: context.metrics,
+    contentWidth: currentUsage.contentWidth,
+  });
+  const gap = slide.blocks.length > 0 ? context.metrics.contentGap : 0;
+  const nextHeight = currentUsage.contentHeight + gap + blockHeight;
+  const nextWeight = slideWeight(slide) + blockWeight(block);
+  const softWeightBudget = context.limits.maxCharactersPerSlide * (allowExtraBlock ? 1.25 : 1.12);
+
+  return nextHeight <= currentUsage.availableHeight && nextWeight <= softWeightBudget;
+}
+
+function canMergeSlides(left, right, context) {
   if (!left || !right) return false;
   if (hasHeavyBlock(left) || hasHeavyBlock(right)) return false;
   const extraTitleBlock = left.title !== right.title ? 1 : 0;
   const combinedBlocks = left.blocks.length + right.blocks.length + extraTitleBlock;
   const combinedWeight = slideWeight(left) + slideWeight(right) + (extraTitleBlock ? right.title.length + 24 : 0);
   const sameSection = left.title === right.title;
-  const blockBudget = sameSection ? limits.maxBlocksPerSlide + 1 : limits.maxBlocksPerSlide;
-  const weightBudget = sameSection ? limits.maxCharactersPerSlide * 1.2 : limits.maxCharactersPerSlide;
-  return combinedBlocks <= blockBudget && combinedWeight <= weightBudget;
+  const blockBudget = sameSection ? context.limits.maxBlocksPerSlide + 1 : context.limits.maxBlocksPerSlide;
+  const weightBudget = sameSection ? context.limits.maxCharactersPerSlide * 1.25 : context.limits.maxCharactersPerSlide * 1.08;
+  if (combinedBlocks > blockBudget || combinedWeight > weightBudget) return false;
+
+  const merged = mergeSlides(left, right);
+  return !getSlideUsage(merged, context).hasEstimatedOverflow;
 }
 
 function mergeSlides(left, right) {
@@ -69,15 +100,15 @@ function mergeSlides(left, right) {
   };
 }
 
-function compactSparseSlides(slides, limits) {
-  const minUsefulWeight = Math.max(100, limits.maxCharactersPerSlide * 0.34);
+function compactSparseSlides(slides, context) {
   const compacted = [];
 
   for (const slide of slides) {
     const previous = compacted.at(-1);
-    const isSparse = slideWeight(slide) < minUsefulWeight && slide.blocks.length <= 2;
+    const usage = getSlideUsage(slide, context);
+    const isSparse = usage.fillRatio < context.metrics.sparseFillRatio && slide.blocks.length <= 2 && slide.type !== "cover";
 
-    if (isSparse && canMergeSlides(previous, slide, limits)) {
+    if (isSparse && canMergeSlides(previous, slide, context)) {
       compacted[compacted.length - 1] = mergeSlides(previous, slide);
       continue;
     }
@@ -89,8 +120,9 @@ function compactSparseSlides(slides, limits) {
   for (let index = 0; index < compacted.length; index += 1) {
     const slide = compacted[index];
     const next = compacted[index + 1];
-    const isSparse = slideWeight(slide) < minUsefulWeight && slide.blocks.length <= 2;
-    if (isSparse && canMergeSlides(slide, next, limits)) {
+    const usage = getSlideUsage(slide, context);
+    const isSparse = usage.fillRatio < context.metrics.sparseFillRatio && slide.blocks.length <= 2 && slide.type !== "cover";
+    if (isSparse && canMergeSlides(slide, next, context)) {
       secondPass.push(mergeSlides(slide, next));
       index += 1;
     } else {
@@ -101,14 +133,33 @@ function compactSparseSlides(slides, limits) {
   return secondPass;
 }
 
-function shouldStartNewSlide(current, nextBlock, limits) {
+function rebalanceSparseSlides(slides, context) {
+  const output = slides.map((slide) => ({ ...slide, blocks: [...slide.blocks] }));
+
+  for (let index = 0; index < output.length - 1; index += 1) {
+    const slide = output[index];
+    const next = output[index + 1];
+    if (!next || slide.type === "cover" || hasHeavyBlock(slide) || hasHeavyBlock(next)) continue;
+    const usage = getSlideUsage(slide, context);
+    if (usage.fillRatio >= context.metrics.sparseFillRatio) continue;
+    const candidate = next.blocks[0];
+    if (!candidate || candidate.type === "code" || candidate.type === "table" || candidate.type === "image") continue;
+    if (!canFitBlock(slide, candidate, context, { allowExtraBlock: true })) continue;
+
+    slide.blocks.push(candidate);
+    next.blocks.shift();
+  }
+
+  return output.filter((slide) => slide.blocks.length > 0);
+}
+
+function shouldStartNewSlide(current, nextBlock, context) {
   if (!current) return true;
   if (current.blocks.length === 0) return false;
-  if (current.blocks.length >= limits.maxBlocksPerSlide) return true;
-  if (codeLineCount(nextBlock) > limits.maxCodeLinesPerSlide) return true;
+  if (current.blocks.length >= context.limits.maxBlocksPerSlide) return true;
+  if (codeLineCount(nextBlock) > context.limits.maxCodeLinesPerSlide) return true;
 
-  const currentWeight = current.blocks.reduce((total, block) => total + blockWeight(block), 0);
-  return currentWeight + blockWeight(nextBlock) > limits.maxCharactersPerSlide;
+  return !canFitBlock(current, nextBlock, context);
 }
 
 function sectionKicker(level) {
@@ -117,20 +168,26 @@ function sectionKicker(level) {
   return "Note";
 }
 
-function shouldContinueWithSubheading(current, currentHeadingLevel, heading, limits) {
+function shouldContinueWithSubheading(current, currentHeadingLevel, heading, context) {
   if (!current || current.blocks.length === 0) return false;
   if (!currentHeadingLevel || heading.level <= currentHeadingLevel) return false;
-  if (current.blocks.length >= Math.max(1, limits.maxBlocksPerSlide - 1)) return false;
+  if (current.blocks.length >= Math.max(1, context.limits.maxBlocksPerSlide - 1)) return false;
 
-  const headingWeight = normalizeTitle(heading.text).length + 24;
-  const allowedWeight = limits.maxCharactersPerSlide * 0.62;
-  return slideWeight(current) + headingWeight <= allowedWeight;
+  const subheading = { type: "subheading", text: normalizeTitle(heading.text), level: heading.level };
+  const allowedWeight = context.limits.maxCharactersPerSlide * 0.68;
+  return slideWeight(current) + blockWeight(subheading) <= allowedWeight && canFitBlock(current, subheading, context);
 }
 
 export function planSlides(document, options = {}) {
   const limits = {
     ...DEFAULT_LIMITS,
     ...(options.limits || {}),
+  };
+  const context = {
+    limits,
+    metrics: options.layoutMetrics || getThemeLayoutMetrics(options.theme),
+    width: options.width || 1242,
+    height: options.height || 1660,
   };
   const slides = [];
   const title = options.title || document.title;
@@ -158,7 +215,7 @@ export function planSlides(document, options = {}) {
       const headingTitle = normalizeTitle(block.text);
       const headingKicker = sectionKicker(block.level);
 
-      if (shouldContinueWithSubheading(current, currentHeadingLevel, block, limits)) {
+      if (shouldContinueWithSubheading(current, currentHeadingLevel, block, context)) {
         current.blocks.push({ type: "subheading", text: headingTitle, level: block.level });
         currentTitle = headingTitle;
         currentKicker = headingKicker;
@@ -177,7 +234,7 @@ export function planSlides(document, options = {}) {
       continue;
     }
 
-    if (!current || shouldStartNewSlide(current, block, limits)) {
+    if (!current || shouldStartNewSlide(current, block, context)) {
       startSlide({
         kicker: currentKicker,
         slideTitle: currentTitle,
@@ -193,7 +250,7 @@ export function planSlides(document, options = {}) {
   }
 
   const nonEmptySlides = slides.filter((slide) => slide.blocks.length > 0);
-  const compactedSlides = compactSparseSlides(nonEmptySlides, limits);
+  const compactedSlides = rebalanceSparseSlides(compactSparseSlides(nonEmptySlides, context), context);
   const outputSlides =
     compactedSlides.length > 0
       ? compactedSlides

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseMarkdown } from "../src/markdown/parse-markdown.mjs";
 import { planSlides } from "../src/planner/plan-slides.mjs";
+import { estimateSlideUsage } from "../src/planner/estimate-slide-height.mjs";
 import { renderDeckHtml } from "../src/render/render-deck-html.mjs";
 import { buildFromMarkdown } from "../src/workflow/build-from-markdown.mjs";
 
@@ -47,6 +48,39 @@ if (!firstNestedSlide.blocks.some((block) => block.type === "subheading" && bloc
 }
 if ("headingLevel" in firstNestedSlide) {
   throw new Error("Planner internal heading metadata must not leak into slides.json.");
+}
+
+const sparseMarkdown = `## A
+
+一句短说明。
+
+## B
+
+另一句短说明。
+
+## C
+
+第三句短说明。
+`;
+const sparseDeck = planSlides(parseMarkdown(sparseMarkdown), {});
+if (sparseDeck.slides.length > 2) {
+  throw new Error("Expected sparse neighboring sections to be compacted.");
+}
+
+const longContentMarkdown = `## 长内容
+
+${"这是一段用于测试高度预算分页的中文内容。".repeat(60)}
+
+\`\`\`js
+${Array.from({ length: 16 }, (_, index) => `console.log("line ${index + 1}");`).join("\n")}
+\`\`\`
+`;
+const longDeck = planSlides(parseMarkdown(longContentMarkdown), {});
+if (longDeck.slides.some((slide) => !slide.blocks.length)) {
+  throw new Error("Generated deck must not contain empty slides.");
+}
+if (longDeck.slides.some((slide) => estimateSlideUsage(slide, {}).fillRatio > 1.18)) {
+  throw new Error("Height budget should avoid obviously overfull slides.");
 }
 
 await rm(tempOut, { recursive: true, force: true });

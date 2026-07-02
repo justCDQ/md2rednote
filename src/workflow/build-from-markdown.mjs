@@ -58,6 +58,7 @@ export async function buildFromMarkdown({
     deck = planSlides(document, {
       ...deckOptions,
       limits: initialLimits,
+      theme,
     });
     html = renderDeckHtml(deck, { theme });
     await writeFile(htmlPath, html, "utf8");
