@@ -34,14 +34,37 @@
           <input id="brand" placeholder="显示在卡片底部" />
         </label>
         <label>
-          每页字数
+          内容密度字数
           <input id="maxChars" type="number" min="120" value="360" />
-          <span class="field-note">控制每张卡片的文字密度，越小拆页越多。</span>
+          <span class="field-note">分页偏好：越大越倾向把内容放在同一页，最终仍以不溢出为准。</span>
         </label>
         <label>
-          每页块数
+          内容块上限
           <input id="maxBlocks" type="number" min="1" value="4" />
-          <span class="field-note">段落、列表、代码块、表格都会算作内容块。</span>
+          <span class="field-note">软上限：短尾页会允许临时多合并一个块。</span>
+        </label>
+        <label>
+          内容密度
+          <select id="densityProfile">
+            <option value="standard">标准</option>
+            <option value="loose">宽松</option>
+            <option value="compact">紧凑</option>
+          </select>
+          <span class="field-note">宽松更安全，紧凑更少页。</span>
+        </label>
+        <label>
+          最小页面填充
+          <input id="minFillRatio" type="number" min="20" max="80" step="5" value="45" />
+          <span class="field-note">低于这个比例时，会尝试合并到相邻页面。</span>
+        </label>
+        <label>
+          代码块拆分
+          <select id="codeSplitStrategy">
+            <option value="avoid">尽量不拆</option>
+            <option value="oversize">超长才拆</option>
+            <option value="strict">严格按行数拆</option>
+          </select>
+          <span class="field-note">默认保持代码块完整，避免少量尾行单独成页。</span>
         </label>
       </div>
 

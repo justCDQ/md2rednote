@@ -3,6 +3,27 @@ import { getThemeLayoutMetrics } from "../themes/theme-registry.mjs";
 import { estimateBlockHeight, estimateSlideUsage } from "./estimate-slide-height.mjs";
 import { splitBlock } from "./split-blocks.mjs";
 
+const DENSITY_PROFILES = {
+  loose: {
+    safetyRatioDelta: -0.08,
+    characterMultiplier: 0.86,
+    mergeWeightMultiplier: 1.05,
+    sparseFillRatioDelta: 0.05,
+  },
+  standard: {
+    safetyRatioDelta: 0,
+    characterMultiplier: 1,
+    mergeWeightMultiplier: 1.18,
+    sparseFillRatioDelta: 0,
+  },
+  compact: {
+    safetyRatioDelta: 0.08,
+    characterMultiplier: 1.24,
+    mergeWeightMultiplier: 1.42,
+    sparseFillRatioDelta: -0.08,
+  },
+};
+
 export function blockWeight(block) {
   if (!block) return 0;
   if (block.type === "paragraph" || block.type === "quote" || block.type === "subheading") return block.text.length;
@@ -17,8 +38,14 @@ function slideWeight(slide) {
   return slide.blocks.reduce((total, block) => total + blockWeight(block), 0);
 }
 
-function hasHeavyBlock(slide) {
-  return slide.blocks.some((block) => block.type === "code" || block.type === "table" || block.type === "image");
+function isHeavyBlock(block, context) {
+  if (!block) return false;
+  if (block.type === "table" || block.type === "image") return true;
+  return block.type === "code" && codeLineCount(block) > Math.max(10, context.limits.maxCodeLinesPerSlide * 0.55);
+}
+
+function hasHeavyBlock(slide, context) {
+  return slide.blocks.some((block) => isHeavyBlock(block, context));
 }
 
 function codeLineCount(block) {
@@ -56,10 +83,10 @@ function getSlideUsage(slide, context) {
   });
 }
 
-function canFitBlock(slide, block, context, { allowExtraBlock = false } = {}) {
+function canFitBlock(slide, block, context, { allowExtraBlock = false, mode = "soft" } = {}) {
   if (!slide) return false;
   const blockLimit = allowExtraBlock ? context.limits.maxBlocksPerSlide + 1 : context.limits.maxBlocksPerSlide;
-  if (slide.blocks.length >= blockLimit) return false;
+  if (mode === "soft" && slide.blocks.length >= blockLimit) return false;
 
   const currentUsage = getSlideUsage(slide, context);
   const blockHeight = estimateBlockHeight(block, {
@@ -69,20 +96,21 @@ function canFitBlock(slide, block, context, { allowExtraBlock = false } = {}) {
   const gap = slide.blocks.length > 0 ? context.metrics.contentGap : 0;
   const nextHeight = currentUsage.contentHeight + gap + blockHeight;
   const nextWeight = slideWeight(slide) + blockWeight(block);
-  const softWeightBudget = context.limits.maxCharactersPerSlide * (allowExtraBlock ? 1.25 : 1.12);
+  const weightMultiplier = mode === "hard" ? context.density.mergeWeightMultiplier : 1.12;
+  const softWeightBudget = context.limits.maxCharactersPerSlide * (allowExtraBlock ? weightMultiplier + 0.18 : weightMultiplier);
 
   return nextHeight <= currentUsage.availableHeight && nextWeight <= softWeightBudget;
 }
 
 function canMergeSlides(left, right, context) {
   if (!left || !right) return false;
-  if (hasHeavyBlock(left) || hasHeavyBlock(right)) return false;
+  const sameSection = left.title === right.title;
+  if (!sameSection) return false;
   const extraTitleBlock = left.title !== right.title ? 1 : 0;
   const combinedBlocks = left.blocks.length + right.blocks.length + extraTitleBlock;
   const combinedWeight = slideWeight(left) + slideWeight(right) + (extraTitleBlock ? right.title.length + 24 : 0);
-  const sameSection = left.title === right.title;
   const blockBudget = sameSection ? context.limits.maxBlocksPerSlide + 1 : context.limits.maxBlocksPerSlide;
-  const weightBudget = sameSection ? context.limits.maxCharactersPerSlide * 1.25 : context.limits.maxCharactersPerSlide * 1.08;
+  const weightBudget = context.limits.maxCharactersPerSlide * (sameSection ? context.density.mergeWeightMultiplier : 1.08);
   if (combinedBlocks > blockBudget || combinedWeight > weightBudget) return false;
 
   const merged = mergeSlides(left, right);
@@ -139,15 +167,58 @@ function rebalanceSparseSlides(slides, context) {
   for (let index = 0; index < output.length - 1; index += 1) {
     const slide = output[index];
     const next = output[index + 1];
-    if (!next || slide.type === "cover" || hasHeavyBlock(slide) || hasHeavyBlock(next)) continue;
+    if (!next || slide.type === "cover") continue;
+    if (slide.title !== next.title) continue;
     const usage = getSlideUsage(slide, context);
     if (usage.fillRatio >= context.metrics.sparseFillRatio) continue;
     const candidate = next.blocks[0];
-    if (!candidate || candidate.type === "code" || candidate.type === "table" || candidate.type === "image") continue;
-    if (!canFitBlock(slide, candidate, context, { allowExtraBlock: true })) continue;
+    if (!candidate || isHeavyBlock(candidate, context)) continue;
+    if (!canFitBlock(slide, candidate, context, { allowExtraBlock: true, mode: "hard" })) continue;
 
     slide.blocks.push(candidate);
     next.blocks.shift();
+  }
+
+  return output.filter((slide) => slide.blocks.length > 0);
+}
+
+function isShortOrphanSlide(slide, context) {
+  if (!slide || slide.type === "cover" || slide.blocks.length !== 1) return false;
+  const block = slide.blocks[0];
+  if (isHeavyBlock(block, context)) return false;
+  if (block.type === "paragraph" || block.type === "quote" || block.type === "subheading") {
+    return block.text.length <= Math.max(48, context.limits.maxCharactersPerSlide * 0.25);
+  }
+  if (block.type === "bullets" || block.type === "steps") {
+    return block.items.length <= 2 && block.items.join("").length <= Math.max(56, context.limits.maxCharactersPerSlide * 0.28);
+  }
+  if (block.type === "code") return codeLineCount(block) < context.limits.minCodeTailLines;
+  return false;
+}
+
+function repairOrphanSlides(slides, context) {
+  const output = slides.map((slide) => ({ ...slide, blocks: [...slide.blocks] }));
+
+  for (let index = 1; index < output.length; index += 1) {
+    const slide = output[index];
+    const previous = output[index - 1];
+    if (!isShortOrphanSlide(slide, context) || !previous) continue;
+
+    const sameSection = previous.title === slide.title;
+    if (!sameSection) continue;
+    const candidate =
+      slide.blocks[0].type === "subheading"
+        ? slide.blocks[0]
+        : slide.blocks[0];
+    const merged = {
+      ...previous,
+      blocks: [...previous.blocks, candidate],
+    };
+
+    if (!getSlideUsage(merged, context).hasEstimatedOverflow) {
+      output[index - 1] = merged;
+      slide.blocks = [];
+    }
   }
 
   return output.filter((slide) => slide.blocks.length > 0);
@@ -159,7 +230,7 @@ function shouldStartNewSlide(current, nextBlock, context) {
   if (current.blocks.length >= context.limits.maxBlocksPerSlide) return true;
   if (codeLineCount(nextBlock) > context.limits.maxCodeLinesPerSlide) return true;
 
-  return !canFitBlock(current, nextBlock, context);
+  return !canFitBlock(current, nextBlock, context, { mode: "soft" });
 }
 
 function sectionKicker(level) {
@@ -175,17 +246,74 @@ function shouldContinueWithSubheading(current, currentHeadingLevel, heading, con
 
   const subheading = { type: "subheading", text: normalizeTitle(heading.text), level: heading.level };
   const allowedWeight = context.limits.maxCharactersPerSlide * 0.68;
-  return slideWeight(current) + blockWeight(subheading) <= allowedWeight && canFitBlock(current, subheading, context);
+  return slideWeight(current) + blockWeight(subheading) <= allowedWeight && canFitBlock(current, subheading, context, { mode: "soft" });
+}
+
+function splitCodeForSlide(block, context) {
+  const lines = String(block.source || "").split("\n");
+  const maxLines = Math.max(1, context.limits.maxCodeLinesPerBlock || context.limits.maxCodeLinesPerSlide);
+  if (lines.length <= maxLines) return [block];
+
+  let chunkCount = Math.ceil(lines.length / maxLines);
+  let chunkSize = Math.ceil(lines.length / chunkCount);
+  const tailLines = lines.length % chunkSize;
+  if (tailLines > 0 && tailLines < context.limits.minCodeTailLines && chunkCount > 1) {
+    chunkSize = Math.ceil(lines.length / (chunkCount - 1));
+  }
+
+  const chunks = [];
+  for (let index = 0; index < lines.length; index += chunkSize) {
+    chunks.push(lines.slice(index, index + chunkSize).join("\n"));
+  }
+
+  return chunks.map((source, index) => ({
+    ...block,
+    source,
+    caption: chunks.length > 1 ? `Part ${index + 1}/${chunks.length}` : block.caption,
+  }));
+}
+
+function normalizeLimits(inputLimits) {
+  const profile = DENSITY_PROFILES[inputLimits.densityProfile] || DENSITY_PROFILES.standard;
+  const maxCharactersPerSlide = Math.max(120, Math.round(inputLimits.maxCharactersPerSlide * profile.characterMultiplier));
+  return {
+    ...inputLimits,
+    maxCharactersPerSlide,
+    maxParagraphCharacters:
+      inputLimits.maxParagraphCharacters === DEFAULT_LIMITS.maxParagraphCharacters
+        ? Math.max(80, Math.round(maxCharactersPerSlide * 0.45))
+        : inputLimits.maxParagraphCharacters,
+    maxQuoteCharacters:
+      inputLimits.maxQuoteCharacters === DEFAULT_LIMITS.maxQuoteCharacters
+        ? Math.max(70, Math.round(maxCharactersPerSlide * 0.36))
+        : inputLimits.maxQuoteCharacters,
+    maxListItemsPerBlock:
+      inputLimits.maxListItemsPerBlock === DEFAULT_LIMITS.maxListItemsPerBlock
+        ? Math.max(2, Math.min(8, inputLimits.maxBlocksPerSlide + (inputLimits.densityProfile === "compact" ? 2 : 1)))
+        : inputLimits.maxListItemsPerBlock,
+  };
+}
+
+function applyDensityToMetrics(metrics, limits) {
+  const profile = DENSITY_PROFILES[limits.densityProfile] || DENSITY_PROFILES.standard;
+  return {
+    ...metrics,
+    safetyRatio: Math.max(0.72, Math.min(0.98, metrics.safetyRatio + profile.safetyRatioDelta)),
+    sparseFillRatio: Math.max(0.25, Math.min(0.72, limits.minFillRatio + profile.sparseFillRatioDelta)),
+  };
 }
 
 export function planSlides(document, options = {}) {
-  const limits = {
+  const rawLimits = {
     ...DEFAULT_LIMITS,
     ...(options.limits || {}),
   };
+  const limits = normalizeLimits(rawLimits);
+  const density = DENSITY_PROFILES[rawLimits.densityProfile] || DENSITY_PROFILES.standard;
   const context = {
     limits,
-    metrics: options.layoutMetrics || getThemeLayoutMetrics(options.theme),
+    density,
+    metrics: applyDensityToMetrics(options.layoutMetrics || getThemeLayoutMetrics(options.theme), limits),
     width: options.width || 1242,
     height: options.height || 1660,
   };
@@ -241,7 +369,21 @@ export function planSlides(document, options = {}) {
       });
     }
 
-    current.blocks.push(block);
+    if (
+      block.type === "code" &&
+      current.blocks.length === 0 &&
+      !canFitBlock(current, block, context, { mode: "hard", allowExtraBlock: true })
+    ) {
+      const codeParts = splitCodeForSlide(block, context);
+      for (const part of codeParts) {
+        if (current.blocks.length > 0 && shouldStartNewSlide(current, part, context)) {
+          startSlide({ kicker: currentKicker, slideTitle: currentTitle });
+        }
+        current.blocks.push(part);
+      }
+    } else {
+      current.blocks.push(block);
+    }
   }
   }
 
@@ -250,7 +392,7 @@ export function planSlides(document, options = {}) {
   }
 
   const nonEmptySlides = slides.filter((slide) => slide.blocks.length > 0);
-  const compactedSlides = rebalanceSparseSlides(compactSparseSlides(nonEmptySlides, context), context);
+  const compactedSlides = repairOrphanSlides(rebalanceSparseSlides(compactSparseSlides(nonEmptySlides, context), context), context);
   const outputSlides =
     compactedSlides.length > 0
       ? compactedSlides

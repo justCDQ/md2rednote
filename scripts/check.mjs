@@ -54,17 +54,15 @@ const sparseMarkdown = `## A
 
 一句短说明。
 
-## B
-
 另一句短说明。
-
-## C
 
 第三句短说明。
 `;
-const sparseDeck = planSlides(parseMarkdown(sparseMarkdown), {});
+const sparseDeck = planSlides(parseMarkdown(sparseMarkdown), {
+  limits: { maxBlocksPerSlide: 1, maxCharactersPerSlide: 220 },
+});
 if (sparseDeck.slides.length > 2) {
-  throw new Error("Expected sparse neighboring sections to be compacted.");
+  throw new Error("Expected sparse slides within the same heading to be compacted.");
 }
 
 const longContentMarkdown = `## 长内容
@@ -81,6 +79,70 @@ if (longDeck.slides.some((slide) => !slide.blocks.length)) {
 }
 if (longDeck.slides.some((slide) => estimateSlideUsage(slide, {}).fillRatio > 1.18)) {
   throw new Error("Height budget should avoid obviously overfull slides.");
+}
+
+const densityMarkdown = `## 密度测试
+
+${Array.from({ length: 8 }, (_, index) => `这是第 ${index + 1} 段用于测试分页参数是否生效的内容，文字不长但需要能够被合并。`).join("\n\n")}
+`;
+const lowDensityDeck = planSlides(parseMarkdown(densityMarkdown), {
+  limits: { maxCharactersPerSlide: 180, maxBlocksPerSlide: 2, densityProfile: "loose" },
+});
+const highDensityDeck = planSlides(parseMarkdown(densityMarkdown), {
+  limits: { maxCharactersPerSlide: 520, maxBlocksPerSlide: 6, densityProfile: "compact" },
+});
+if (highDensityDeck.slides.length > lowDensityDeck.slides.length) {
+  throw new Error("Increasing density controls should not create more slides.");
+}
+
+const codeTailMarkdown = `## 代码尾部
+
+前面有一段解释，后面跟一个短代码块。
+
+\`\`\`js
+console.log("one");
+console.log("two");
+\`\`\`
+`;
+const codeTailDeck = planSlides(parseMarkdown(codeTailMarkdown), {
+  limits: { maxCharactersPerSlide: 520, maxBlocksPerSlide: 4, codeSplitStrategy: "avoid" },
+});
+if (codeTailDeck.slides.some((slide) => slide.blocks.length === 1 && slide.blocks[0].type === "code" && slide.blocks[0].source.split("\n").length < 4)) {
+  throw new Error("Short code tails should not become isolated slides.");
+}
+
+const orphanMarkdown = `## 同一标题
+
+${"这是一段主体内容，用于占据页面但仍保留少量空间。".repeat(18)}
+
+孤儿行。
+`;
+const orphanDeck = planSlides(parseMarkdown(orphanMarkdown), {
+  limits: { maxCharactersPerSlide: 520, maxBlocksPerSlide: 5, densityProfile: "compact" },
+});
+if (orphanDeck.slides.some((slide) => slide.blocks.length === 1 && slide.blocks[0].type === "paragraph" && slide.blocks[0].text === "孤儿行。")) {
+  throw new Error("One-line orphan slides should be merged back when space allows.");
+}
+
+const sectionBoundaryMarkdown = `## 上一节标题
+
+这是一段上一节的简短内容，页面还有空间。
+
+## 新标题
+
+这段内容属于新标题，不能被单独移动到上一节下面。
+
+\`\`\`js
+console.log("keep section boundary");
+console.log("with code block");
+\`\`\`
+`;
+const sectionBoundaryDeck = planSlides(parseMarkdown(sectionBoundaryMarkdown), {
+  limits: { maxCharactersPerSlide: 620, maxBlocksPerSlide: 4, densityProfile: "compact" },
+});
+const previousSectionSlide = sectionBoundaryDeck.slides.find((slide) => slide.title === "上一节标题");
+if (previousSectionSlide?.blocks.some((block) => block.type === "paragraph" && block.text.includes("这段内容属于新标题"))) {
+  throw new Error("Content from a new heading must not be moved under the previous slide title.");
 }
 
 await rm(tempOut, { recursive: true, force: true });

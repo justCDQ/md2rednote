@@ -67,9 +67,9 @@ cat > "${CONTENTS}/Info.plist" << PLIST
   <key>CFBundleIdentifier</key>
   <string>dev.xhscardgen.local</string>
   <key>CFBundleVersion</key>
-  <string>0.1.0</string>
+  <string>${VERSION}</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>${VERSION}</string>
   <key>CFBundleExecutable</key>
   <string>launch</string>
   <key>CFBundlePackageType</key>

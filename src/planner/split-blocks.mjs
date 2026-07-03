@@ -36,11 +36,19 @@ function splitItems(items, maxItems) {
   return chunks;
 }
 
-function splitCode(source, maxLines) {
+function splitCode(source, maxLines, minTailLines = 4) {
   const lines = source.split("\n");
   const chunks = [];
-  for (let index = 0; index < lines.length; index += maxLines) {
-    chunks.push(lines.slice(index, index + maxLines).join("\n"));
+  if (lines.length <= maxLines) return [source];
+
+  const tailLines = lines.length % maxLines;
+  const safeMaxLines =
+    tailLines > 0 && tailLines < minTailLines && lines.length > maxLines
+      ? Math.max(1, Math.ceil(lines.length / Math.ceil(lines.length / maxLines)))
+      : maxLines;
+
+  for (let index = 0; index < lines.length; index += safeMaxLines) {
+    chunks.push(lines.slice(index, index + safeMaxLines).join("\n"));
   }
   return chunks;
 }
@@ -79,8 +87,8 @@ export function splitBlock(block, limits) {
     }));
   }
 
-  if (block.type === "code") {
-    return splitCode(block.source, limits.maxCodeLinesPerBlock).map((source, index, parts) => ({
+  if (block.type === "code" && limits.codeSplitStrategy === "strict") {
+    return splitCode(block.source, limits.maxCodeLinesPerBlock, limits.minCodeTailLines).map((source, index, parts) => ({
       ...block,
       source,
       caption: parts.length > 1 ? `Part ${index + 1}/${parts.length}` : undefined,

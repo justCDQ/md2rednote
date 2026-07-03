@@ -6,11 +6,16 @@ This project follows simple GitHub Release versioning. Update the top `Unrelease
 
 ## Unreleased
 
+## 0.3.0
+
 - Split the local app frontend into maintainable JS/CSS modules.
 - Improve the generated card editor with block add/delete/reorder controls and local draft recovery.
 - Add versioned local app release artifacts through `npm run local:build`.
 - Add `npm run release:check` for pre-release validation.
 - Document the GitHub Actions follow-up, which requires a token with `workflow` scope.
+- Add height-aware pagination with configurable content density, minimum page fill, and code split strategy.
+- Avoid unnecessary code block splitting and isolated short code tails.
+- Preserve heading ownership during sparse-page compaction so content is not moved under the wrong title.
 
 ## 0.1.0
 

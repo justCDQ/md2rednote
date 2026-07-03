@@ -43,15 +43,15 @@ Outputs:
 
 ```text
 dist-local/
-  md2rednote-v0.1.0-macos-arm64.zip
-  md2rednote-v0.1.0-windows-x64.zip
+  md2rednote-v0.3.0-macos-arm64.zip
+  md2rednote-v0.3.0-windows-x64.zip
 ```
 
-Artifact names are derived from `package.json` version. For example, version `0.1.1` produces:
+Artifact names are derived from `package.json` version. For example, version `0.3.1` produces:
 
 ```text
-md2rednote-v0.1.1-macos-arm64.zip
-md2rednote-v0.1.1-windows-x64.zip
+md2rednote-v0.3.1-macos-arm64.zip
+md2rednote-v0.3.1-windows-x64.zip
 ```
 
 ## Pre-release Check

@@ -12,6 +12,10 @@ export const DEFAULT_LIMITS = {
   maxListItemsPerBlock: 5,
   maxCodeLinesPerBlock: 24,
   maxTableRowsPerBlock: 5,
+  densityProfile: "standard",
+  minFillRatio: 0.45,
+  codeSplitStrategy: "avoid",
+  minCodeTailLines: 4,
 };
 
 export function createDeck({ title, brand, slides, width, height, source }) {

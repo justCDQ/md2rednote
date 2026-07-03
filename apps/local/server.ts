@@ -17,7 +17,7 @@ import { repairOverflowPages } from "../../src/workflow/repair-overflow.mjs";
 const PORT = Number(process.env.XHS_CARDGEN_PORT || 4927);
 const IS_WIN = process.platform === "win32";
 const DEFAULT_OUTPUT = path.join(os.homedir(), "Desktop", "xhs-cardgen-exports");
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.3.0";
 const STATIC_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -41,6 +41,9 @@ type RenderPayload = {
   theme?: string;
   maxCharactersPerSlide?: number;
   maxBlocksPerSlide?: number;
+  densityProfile?: string;
+  minFillRatio?: number;
+  codeSplitStrategy?: string;
 };
 
 type SavePayload = RenderPayload & {
@@ -116,6 +119,9 @@ function createDeckFromMarkdown(payload: RenderPayload) {
     ...DEFAULT_LIMITS,
     maxCharactersPerSlide: payload.maxCharactersPerSlide || 360,
     maxBlocksPerSlide: payload.maxBlocksPerSlide || 4,
+    densityProfile: payload.densityProfile || "standard",
+    minFillRatio: payload.minFillRatio || 0.45,
+    codeSplitStrategy: payload.codeSplitStrategy || "avoid",
   };
   const deck = planSlides(document, {
     title: payload.title || undefined,
