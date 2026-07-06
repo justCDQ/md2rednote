@@ -160,12 +160,29 @@ CLI example:
 npx md2rednote build ./article.md --theme dark-code
 ```
 
+## Content Templates
+
+The local app includes content templates that combine a recommended theme, pagination density, code splitting behavior, and card label tone.
+
+Built-in templates include:
+
+- 技术教程
+- 代码深潜
+- 学习笔记
+- 面试题卡
+- 观点杂志
+
+Templates apply when regenerating cards from Markdown. They do not rewrite the original Markdown and do not call an LLM.
+
 ## Edit Generated Cards
 
 The local app lets you adjust the generated deck before export:
 
 - edit card kicker, title, hero, footer, and block text
 - duplicate, delete, and reorder cards
+- split the current slide after a selected block
+- merge the next slide into the current slide
+- duplicate a selected content block
 - switch visual themes without regenerating from Markdown
 - save/export the edited `slides.json`
 

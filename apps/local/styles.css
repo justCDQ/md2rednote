@@ -176,12 +176,14 @@ iframe {
 }
 .system-ok { color: #2f6a36; font-weight: 800; }
 .system-warn { color: #9b3f30; font-weight: 800; }
-.theme-grid {
+.theme-grid,
+.template-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.theme-card {
+.theme-card,
+.template-card {
   height: auto;
   min-height: 96px;
   display: grid;
@@ -193,17 +195,20 @@ iframe {
   text-align: left;
   font-weight: 700;
 }
-.theme-card.active {
+.theme-card.active,
+.template-card.active {
   border-color: #9b3f30;
   background: #fff6ea;
   box-shadow: inset 0 0 0 1px #9b3f30;
 }
-.theme-name {
+.theme-name,
+.template-name {
   color: #171714;
   font-size: 13px;
   line-height: 1.2;
 }
-.theme-description {
+.theme-description,
+.template-description {
   color: #7b7063;
   font-size: 11px;
   line-height: 1.35;
@@ -234,6 +239,7 @@ iframe {
 }
 .draft-actions,
 .editor-actions,
+.refine-actions,
 .block-actions {
   display: grid;
   gap: 8px;
@@ -243,6 +249,12 @@ iframe {
 }
 .editor-actions {
   grid-template-columns: repeat(4, 1fr);
+}
+.refine-actions {
+  grid-template-columns: minmax(0, 1fr) 1fr 1fr;
+}
+.refine-actions button:last-child {
+  grid-column: span 2;
 }
 .block-actions {
   grid-template-columns: minmax(0, 1fr) 1fr;
@@ -270,6 +282,7 @@ iframe {
   color: #7a271c;
 }
 .editor-actions button,
+.refine-actions button,
 .draft-actions button,
 .block-actions button,
 .apply-editor {

@@ -2,6 +2,7 @@ import { postJsonWithCode } from "./api-client.js";
 import { clearDraft, createDeckEditor, loadDraft, saveDraft } from "./deck-editor.js";
 import { diagnosticsText, updateSystemInfo } from "./diagnostics.js";
 import { makePreviewHtml } from "./preview.js";
+import { renderTemplateCards, templateById } from "./template-ui.js";
 import { renderThemeCards, themeName } from "./theme-ui.js";
 
 const els = {
@@ -9,6 +10,8 @@ const els = {
   markdown: document.querySelector("#markdown"),
   title: document.querySelector("#title"),
   brand: document.querySelector("#brand"),
+  templateId: document.querySelector("#templateId"),
+  templateGrid: document.querySelector("#templateGrid"),
   theme: document.querySelector("#theme"),
   maxChars: document.querySelector("#maxChars"),
   maxBlocks: document.querySelector("#maxBlocks"),
@@ -40,6 +43,11 @@ const els = {
   moveDown: document.querySelector("#moveDown"),
   duplicateSlide: document.querySelector("#duplicateSlide"),
   deleteSlide: document.querySelector("#deleteSlide"),
+  refineBlockIndex: document.querySelector("#refineBlockIndex"),
+  splitSlideAfterBlock: document.querySelector("#splitSlideAfterBlock"),
+  mergeNextSlide: document.querySelector("#mergeNextSlide"),
+  duplicateBlock: document.querySelector("#duplicateBlock"),
+  clearHero: document.querySelector("#clearHero"),
   addBlock: document.querySelector("#addBlock"),
   newBlockType: document.querySelector("#newBlockType"),
   restoreDraft: document.querySelector("#restoreDraft"),
@@ -126,6 +134,7 @@ function payload() {
     title: els.title.value.trim(),
     brand: els.brand.value.trim(),
     theme: els.theme.value,
+    templateId: els.templateId.value,
     maxCharactersPerSlide: Number(els.maxChars.value || 360),
     maxBlocksPerSlide: Number(els.maxBlocks.value || 4),
     densityProfile: els.densityProfile.value,
@@ -182,6 +191,20 @@ async function renderPreview() {
   return result;
 }
 
+function applyTemplateControls(templateId) {
+  const template = templateById(templateId);
+  els.templateId.value = template.id;
+  els.theme.value = template.theme;
+  els.maxChars.value = template.controls.maxChars;
+  els.maxBlocks.value = template.controls.maxBlocks;
+  els.densityProfile.value = template.controls.densityProfile;
+  els.minFillRatio.value = template.controls.minFillRatio;
+  els.codeSplitStrategy.value = template.controls.codeSplitStrategy;
+  renderTemplateCards(els.templateGrid, template.id);
+  renderThemeCards(els.themeGrid, els.theme.value);
+  return template;
+}
+
 async function selectTheme(themeId) {
   if (state.busy || els.theme.value === themeId) return;
   els.theme.value = themeId;
@@ -226,6 +249,17 @@ function wireEvents() {
     const card = event.target.closest("[data-theme-id]");
     if (!card) return;
     await selectTheme(card.dataset.themeId);
+  });
+
+  els.templateGrid.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-template-id]");
+    if (!card || state.busy) return;
+    const template = applyTemplateControls(card.dataset.templateId);
+    if (state.currentDeck) {
+      setStatus(`已选择模板：${template.name}。重新预览后会按这个模板生成。`, "warning");
+    } else {
+      setStatus(`已选择模板：${template.name}。`);
+    }
   });
 
   els.preview.addEventListener("click", async () => {
@@ -366,7 +400,7 @@ function boot() {
     setStatus,
   });
   deckEditor.wire();
-  renderThemeCards(els.themeGrid, els.theme.value);
+  applyTemplateControls(els.templateId.value);
   wireEvents();
   loadSystemInfo();
   if (loadDraft()) setStatus("检测到本地草稿，可在卡片编辑区点击“恢复草稿”。", "warning");

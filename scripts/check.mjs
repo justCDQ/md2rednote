@@ -5,6 +5,7 @@ import { parseMarkdown } from "../src/markdown/parse-markdown.mjs";
 import { planSlides } from "../src/planner/plan-slides.mjs";
 import { estimateSlideUsage } from "../src/planner/estimate-slide-height.mjs";
 import { renderDeckHtml } from "../src/render/render-deck-html.mjs";
+import { applyTemplateToDeck } from "../src/templates/template-registry.mjs";
 import { buildFromMarkdown } from "../src/workflow/build-from-markdown.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,6 +23,14 @@ if (!deck.slides.length) {
 
 if (!html.includes("class=\"card")) {
   throw new Error("Expected rendered HTML to contain card markup.");
+}
+
+const templatedDeck = applyTemplateToDeck(deck, "code-deep-dive");
+if (templatedDeck.slides.length !== deck.slides.length) {
+  throw new Error("Applying a template must not add or remove slides.");
+}
+if (!templatedDeck.slides.some((slide) => ["入口", "代码笔记", "源码段落", "关键实现", "边界情况"].includes(slide.kicker))) {
+  throw new Error("Expected template labels to be applied to generated slides.");
 }
 
 const nestedHeadingMarkdown = `## 第二部分：tj/co 源码逐段剖析

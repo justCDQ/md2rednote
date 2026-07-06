@@ -7,6 +7,7 @@ import { DEFAULT_LIMITS } from "../../src/core/schema.mjs";
 import { parseMarkdown } from "../../src/markdown/parse-markdown.mjs";
 import { planSlides, refreshSlideFooters } from "../../src/planner/plan-slides.mjs";
 import { renderDeckHtml } from "../../src/render/render-deck-html.mjs";
+import { applyTemplateToDeck, getTemplatePreset } from "../../src/templates/template-registry.mjs";
 import {
   exportPngCardsWithSystemChrome,
   findSystemChrome,
@@ -17,7 +18,7 @@ import { repairOverflowPages } from "../../src/workflow/repair-overflow.mjs";
 const PORT = Number(process.env.XHS_CARDGEN_PORT || 4927);
 const IS_WIN = process.platform === "win32";
 const DEFAULT_OUTPUT = path.join(os.homedir(), "Desktop", "xhs-cardgen-exports");
-const APP_VERSION = "0.3.0";
+const APP_VERSION = "0.4.0";
 const STATIC_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -39,6 +40,7 @@ type RenderPayload = {
   title?: string;
   brand?: string;
   theme?: string;
+  templateId?: string;
   maxCharactersPerSlide?: number;
   maxBlocksPerSlide?: number;
   densityProfile?: string;
@@ -115,22 +117,24 @@ function createDeckFromMarkdown(payload: RenderPayload) {
   if (!markdown.trim()) throw new AppError("EMPTY_MARKDOWN", "请先选择 Markdown 文件，或粘贴内容。");
 
   const document = parseMarkdown(markdown);
+  const template = getTemplatePreset(payload.templateId);
   const limits = {
     ...DEFAULT_LIMITS,
-    maxCharactersPerSlide: payload.maxCharactersPerSlide || 360,
-    maxBlocksPerSlide: payload.maxBlocksPerSlide || 4,
-    densityProfile: payload.densityProfile || "standard",
-    minFillRatio: payload.minFillRatio || 0.45,
-    codeSplitStrategy: payload.codeSplitStrategy || "avoid",
+    ...template.limits,
+    maxCharactersPerSlide: payload.maxCharactersPerSlide || template.limits.maxCharactersPerSlide,
+    maxBlocksPerSlide: payload.maxBlocksPerSlide || template.limits.maxBlocksPerSlide,
+    densityProfile: payload.densityProfile || template.limits.densityProfile,
+    minFillRatio: payload.minFillRatio || template.limits.minFillRatio,
+    codeSplitStrategy: payload.codeSplitStrategy || template.limits.codeSplitStrategy,
   };
-  const deck = planSlides(document, {
+  const deck = applyTemplateToDeck(planSlides(document, {
     title: payload.title || undefined,
     brand: payload.brand || undefined,
     source: payload.filename || "browser-import",
     limits,
-    theme: payload.theme || "warm-tech",
-  });
-  const html = renderDeckHtml(deck, { theme: payload.theme || "warm-tech" });
+    theme: payload.theme || template.theme,
+  }), payload.templateId);
+  const html = renderDeckHtml(deck, { theme: payload.theme || template.theme });
   return { deck, html, document, limits };
 }
 

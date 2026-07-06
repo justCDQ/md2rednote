@@ -24,6 +24,12 @@
         <textarea id="markdown" placeholder="选择一个 Markdown 文件，或直接粘贴内容"></textarea>
       </label>
 
+      <input id="templateId" type="hidden" value="tech-tutorial" />
+      <section>
+        <p class="section-title">内容模板</p>
+        <div id="templateGrid" class="template-grid"></div>
+      </section>
+
       <div class="grid">
         <label>
           标题
@@ -136,6 +142,13 @@
           <button id="moveDown" type="button">下移</button>
           <button id="duplicateSlide" type="button">复制</button>
           <button id="deleteSlide" type="button">删除</button>
+        </div>
+        <div class="refine-actions">
+          <select id="refineBlockIndex"></select>
+          <button id="splitSlideAfterBlock" type="button">从此处拆页</button>
+          <button id="mergeNextSlide" type="button">合并下一页</button>
+          <button id="duplicateBlock" type="button">复制内容块</button>
+          <button id="clearHero" type="button">清空导语</button>
         </div>
         <div id="editorFields" class="editor-fields"></div>
         <div class="block-actions">

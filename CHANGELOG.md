@@ -6,6 +6,11 @@ This project follows simple GitHub Release versioning. Update the top `Unrelease
 
 ## Unreleased
 
+## 0.4.0
+
+- Add local app content templates that set recommended theme, density, code splitting, and card labels.
+- Add generated-card refinement actions for splitting slides, merging the next slide, duplicating blocks, and clearing hero text.
+
 ## 0.3.0
 
 - Split the local app frontend into maintainable JS/CSS modules.

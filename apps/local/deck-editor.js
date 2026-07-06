@@ -201,6 +201,15 @@ export function createDeckEditor({ els, getState, setState, renderDeckPreview, s
       <label>页脚<input id="editFooter" value="${escapeHtml(slide.footer || "")}" /></label>
       <div>${(slide.blocks || []).map(renderBlockEditor).join("")}</div>
     `;
+    renderRefineControls(slide);
+  }
+
+  function renderRefineControls(slide) {
+    if (!els.refineBlockIndex) return;
+    const blocks = slide?.blocks || [];
+    els.refineBlockIndex.innerHTML = blocks.length
+      ? blocks.map((block, index) => `<option value="${index}">${index + 1}. ${escapeHtml(blockLabel(block))}</option>`).join("")
+      : `<option value="-1">无内容块</option>`;
   }
 
   function readCurrentSlideFromEditor() {
@@ -252,6 +261,66 @@ export function createDeckEditor({ els, getState, setState, renderDeckPreview, s
     await renderDeckPreview(nextDeck, statusPrefix);
   }
 
+  async function splitSlideAfterSelectedBlock() {
+    const state = getState();
+    if (!state.currentDeck?.slides?.[state.selectedSlideIndex]) return;
+    const blockIndex = Number(els.refineBlockIndex?.value || -1);
+    const nextDeck = clone(state.currentDeck);
+    nextDeck.slides[state.selectedSlideIndex] = readCurrentSlideFromEditor();
+    const slide = nextDeck.slides[state.selectedSlideIndex];
+    if (blockIndex < 0 || blockIndex >= slide.blocks.length - 1) {
+      setStatus("请选择不是最后一个的内容块，再从此处拆页。", "warning");
+      return;
+    }
+    const movedBlocks = slide.blocks.splice(blockIndex + 1);
+    nextDeck.slides.splice(state.selectedSlideIndex + 1, 0, {
+      ...slide,
+      hero: undefined,
+      blocks: movedBlocks,
+    });
+    setState({ currentDeck: nextDeck, selectedSlideIndex: state.selectedSlideIndex + 1, hasManualEdits: true });
+    await renderDeckPreview(nextDeck, "已从选中内容块后拆成新卡片");
+  }
+
+  async function mergeNextSlide() {
+    const state = getState();
+    if (!state.currentDeck?.slides?.[state.selectedSlideIndex]) return;
+    const nextDeck = clone(state.currentDeck);
+    nextDeck.slides[state.selectedSlideIndex] = readCurrentSlideFromEditor();
+    const slide = nextDeck.slides[state.selectedSlideIndex];
+    const nextSlide = nextDeck.slides[state.selectedSlideIndex + 1];
+    if (!nextSlide) {
+      setStatus("当前已经是最后一张卡片。", "warning");
+      return;
+    }
+    const boundary =
+      slide.title && nextSlide.title && slide.title !== nextSlide.title
+        ? [{ type: "subheading", text: nextSlide.title, level: 4 }]
+        : [];
+    slide.blocks = [...(slide.blocks || []), ...boundary, ...(nextSlide.blocks || [])];
+    nextDeck.slides.splice(state.selectedSlideIndex + 1, 1);
+    setState({ currentDeck: nextDeck, hasManualEdits: true });
+    await renderDeckPreview(nextDeck, "已合并下一张卡片");
+  }
+
+  async function duplicateSelectedBlock() {
+    await mutateBlocks((blocks) => {
+      const index = Number(els.refineBlockIndex?.value || -1);
+      if (index < 0 || index >= blocks.length) return;
+      blocks.splice(index + 1, 0, clone(blocks[index]));
+    }, "内容块已复制");
+  }
+
+  async function clearCurrentHero() {
+    const state = getState();
+    if (!state.currentDeck?.slides?.[state.selectedSlideIndex]) return;
+    const nextDeck = clone(state.currentDeck);
+    nextDeck.slides[state.selectedSlideIndex] = readCurrentSlideFromEditor();
+    delete nextDeck.slides[state.selectedSlideIndex].hero;
+    setState({ currentDeck: nextDeck, hasManualEdits: true });
+    await renderDeckPreview(nextDeck, "当前卡片导语已清空");
+  }
+
   function wire() {
     els.slideList.addEventListener("click", (event) => {
       const tab = event.target.closest("[data-slide-index]");
@@ -300,6 +369,11 @@ export function createDeckEditor({ els, getState, setState, renderDeckPreview, s
         return Math.min(index, deck.slides.length - 1);
       }, "卡片已删除");
     });
+
+    els.splitSlideAfterBlock.addEventListener("click", splitSlideAfterSelectedBlock);
+    els.mergeNextSlide.addEventListener("click", mergeNextSlide);
+    els.duplicateBlock.addEventListener("click", duplicateSelectedBlock);
+    els.clearHero.addEventListener("click", clearCurrentHero);
 
     els.addBlock.addEventListener("click", async () => {
       await mutateBlocks((blocks) => {
