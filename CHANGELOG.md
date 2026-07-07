@@ -6,6 +6,12 @@ This project follows simple GitHub Release versioning. Update the top `Unrelease
 
 ## Unreleased
 
+## 0.5.0
+
+- Fix local Markdown image preview and export by resolving image paths through a local image proxy.
+- Add an image base directory field for Markdown files that use relative image paths.
+- Improve Markdown image parsing for image titles like `![alt](image.png "title")`.
+
 ## 0.4.0
 
 - Add local app content templates that set recommended theme, density, code splitting, and card labels.

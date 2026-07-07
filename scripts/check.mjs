@@ -25,6 +25,15 @@ if (!html.includes("class=\"card")) {
   throw new Error("Expected rendered HTML to contain card markup.");
 }
 
+const imageDocument = parseMarkdown(`## 图片测试
+
+![架构图](./assets/demo.png "图片标题")
+`);
+const imageBlock = imageDocument.blocks.find((block) => block.type === "image");
+if (!imageBlock || imageBlock.src !== "./assets/demo.png") {
+  throw new Error("Expected Markdown image parser to keep only the image path.");
+}
+
 const templatedDeck = applyTemplateToDeck(deck, "code-deep-dive");
 if (templatedDeck.slides.length !== deck.slides.length) {
   throw new Error("Applying a template must not add or remove slides.");

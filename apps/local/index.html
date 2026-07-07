@@ -40,6 +40,11 @@
           <input id="brand" placeholder="显示在卡片底部" />
         </label>
         <label>
+          图片根目录
+          <input id="imageBaseDir" placeholder="可选，用于解析 Markdown 里的相对图片路径" />
+          <span class="field-note">如果图片写成 images/a.png，请填写 Markdown 文件所在文件夹。</span>
+        </label>
+        <label>
           内容密度字数
           <input id="maxChars" type="number" min="120" value="360" />
           <span class="field-note">分页偏好：越大越倾向把内容放在同一页，最终仍以不溢出为准。</span>

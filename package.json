@@ -1,6 +1,6 @@
 {
   "name": "md2rednote",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Convert Markdown articles into Xiaohongshu-ready image cards.",
   "type": "module",
   "bin": {

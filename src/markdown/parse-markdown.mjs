@@ -97,10 +97,15 @@ function parseTable(lines, startIndex) {
 function parseImage(line) {
   const match = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
   if (!match) return null;
+  const rawSrc = match[2].trim();
+  const src = rawSrc
+    .replace(/^<(.+)>$/, "$1")
+    .replace(/\s+["'][^"']+["']$/, "")
+    .trim();
   return {
     type: "image",
     alt: match[1],
-    src: match[2],
+    src,
   };
 }
 

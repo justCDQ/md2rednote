@@ -21,6 +21,7 @@ export function diagnosticsText({ systemInfo, payload, lastError }) {
     `端口: ${systemInfo?.port || "unknown"}`,
     `默认输出目录: ${systemInfo?.defaultOutput || "unknown"}`,
     `当前输出目录: ${data.outputDir || systemInfo?.defaultOutput || "default"}`,
+    `图片根目录: ${data.imageBaseDir || "未填写"}`,
     `检测到的 Chrome/Edge: ${systemInfo?.chromePath || "未检测到"}`,
     `当前 Chrome/Edge 路径: ${data.chromePath || "留空"}`,
     `最近一次错误: ${lastError || "无"}`,

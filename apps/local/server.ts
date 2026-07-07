@@ -18,11 +18,21 @@ import { repairOverflowPages } from "../../src/workflow/repair-overflow.mjs";
 const PORT = Number(process.env.XHS_CARDGEN_PORT || 4927);
 const IS_WIN = process.platform === "win32";
 const DEFAULT_OUTPUT = path.join(os.homedir(), "Desktop", "xhs-cardgen-exports");
-const APP_VERSION = "0.4.0";
+const APP_VERSION = "0.5.0";
 const STATIC_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+};
+const IMAGE_TYPES: Record<string, string> = {
+  ".apng": "image/apng",
+  ".avif": "image/avif",
+  ".gif": "image/gif",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
 };
 
 class AppError extends Error {
@@ -41,6 +51,7 @@ type RenderPayload = {
   brand?: string;
   theme?: string;
   templateId?: string;
+  imageBaseDir?: string;
   maxCharactersPerSlide?: number;
   maxBlocksPerSlide?: number;
   densityProfile?: string;
@@ -56,6 +67,7 @@ type SavePayload = RenderPayload & {
 type DeckPayload = {
   deck?: any;
   theme?: string;
+  imageBaseDir?: string;
   outputDir?: string;
   chromePath?: string;
 };
@@ -78,6 +90,57 @@ function staticResponse(name: string) {
   return new Response(content, {
     headers: {
       "Content-Type": STATIC_TYPES[path.extname(name)] || "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function localImageUrl(filePath: string) {
+  return `${localUrl}/api/local-image?path=${encodeURIComponent(filePath)}`;
+}
+
+function normalizeLocalImagePath(src: string, imageBaseDir?: string) {
+  const value = (src || "").trim();
+  if (!value || /^(https?:|data:|blob:)/i.test(value)) return value;
+  if (value.startsWith(`${localUrl}/api/local-image`)) return value;
+
+  let candidate = value;
+  if (/^file:\/\//i.test(value)) {
+    try {
+      candidate = decodeURIComponent(new URL(value).pathname);
+    } catch {
+      candidate = value.replace(/^file:\/\//i, "");
+    }
+  } else if (!path.isAbsolute(value) && imageBaseDir?.trim()) {
+    candidate = path.resolve(imageBaseDir.trim(), value);
+  }
+
+  return path.isAbsolute(candidate) && existsSync(candidate) ? localImageUrl(candidate) : value;
+}
+
+function rewriteDeckImageSources(deck: any, imageBaseDir?: string) {
+  return {
+    ...deck,
+    slides: deck.slides.map((slide: any) => ({
+      ...slide,
+      blocks: (slide.blocks || []).map((block: any) =>
+        block.type === "image"
+          ? { ...block, src: normalizeLocalImagePath(block.src, imageBaseDir) }
+          : block,
+      ),
+    })),
+  };
+}
+
+function localImageResponse(filePath: string) {
+  if (!filePath || !path.isAbsolute(filePath) || !existsSync(filePath)) {
+    return json({ error: "Image not found" }, { status: 404 });
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = IMAGE_TYPES[ext] || "application/octet-stream";
+  return new Response(readFileSync(filePath), {
+    headers: {
+      "Content-Type": contentType,
       "Cache-Control": "no-store",
     },
   });
@@ -127,13 +190,13 @@ function createDeckFromMarkdown(payload: RenderPayload) {
     minFillRatio: payload.minFillRatio || template.limits.minFillRatio,
     codeSplitStrategy: payload.codeSplitStrategy || template.limits.codeSplitStrategy,
   };
-  const deck = applyTemplateToDeck(planSlides(document, {
+  const deck = rewriteDeckImageSources(applyTemplateToDeck(planSlides(document, {
     title: payload.title || undefined,
     brand: payload.brand || undefined,
     source: payload.filename || "browser-import",
     limits,
     theme: payload.theme || template.theme,
-  }), payload.templateId);
+  }), payload.templateId), payload.imageBaseDir);
   const html = renderDeckHtml(deck, { theme: payload.theme || template.theme });
   return { deck, html, document, limits };
 }
@@ -216,11 +279,11 @@ async function saveProject(payload: SavePayload) {
   };
 }
 
-function normalizeDeckPayload(payload: DeckPayload) {
+function normalizeDeckPayload(payload: DeckPayload & { imageBaseDir?: string }) {
   if (!payload.deck || !Array.isArray(payload.deck.slides)) {
     throw new AppError("INVALID_DECK", "卡片数据无效，请重新生成预览。");
   }
-  const deck = refreshSlideFooters(payload.deck);
+  const deck = rewriteDeckImageSources(refreshSlideFooters(payload.deck), payload.imageBaseDir);
   const html = renderDeckHtml(deck, { theme: payload.theme || "warm-tech" });
   return { deck, html };
 }
@@ -331,6 +394,10 @@ Bun.serve({
       }
 
       if (req.method === "GET") {
+        if (url.pathname === "/api/local-image") {
+          return localImageResponse(url.searchParams.get("path") || "");
+        }
+
         const staticName = decodeURIComponent(url.pathname.replace(/^\//, ""));
         if (/^[\w.-]+\.(css|js)$/.test(staticName)) {
           const response = staticResponse(staticName);
