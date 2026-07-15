@@ -68,10 +68,11 @@ function blockRepairScore(block) {
 }
 
 function ensureNextSlide(slides, index, slide) {
-  if (slides[index + 1]) return slides[index + 1];
+  if (slides[index + 1]?.title === slide.title) return slides[index + 1];
   const next = createSlide({
     kicker: slide.kicker,
     title: slide.title,
+    continuation: true,
     blocks: [],
   });
   slides.splice(index + 1, 0, next);

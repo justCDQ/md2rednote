@@ -91,6 +91,9 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
       font-size: 82px;
       line-height: 1.04;
     }
+    .continuation main {
+      padding-top: 30px;
+    }
     .hero {
       margin: 0 0 50px;
       max-width: 900px;

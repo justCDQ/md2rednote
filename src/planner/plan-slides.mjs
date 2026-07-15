@@ -239,14 +239,19 @@ function sectionKicker(level) {
   return "Note";
 }
 
-function shouldContinueWithSubheading(current, currentHeadingLevel, heading, context) {
-  if (!current || current.blocks.length === 0) return false;
-  if (!currentHeadingLevel || heading.level <= currentHeadingLevel) return false;
-  if (current.blocks.length >= Math.max(1, context.limits.maxBlocksPerSlide - 1)) return false;
-
+function canAppendSubheading(current, heading, context) {
+  if (!current) return false;
+  if (current.blocks.length >= context.limits.maxBlocksPerSlide) return false;
   const subheading = { type: "subheading", text: normalizeTitle(heading.text), level: heading.level };
   const allowedWeight = context.limits.maxCharactersPerSlide * 0.68;
   return slideWeight(current) + blockWeight(subheading) <= allowedWeight && canFitBlock(current, subheading, context, { mode: "soft" });
+}
+
+function getPrimaryHeadingLevel(document) {
+  const contentHeadingLevels = document.blocks
+    .filter((block) => block.type === "heading" && block.level > 1)
+    .map((block) => block.level);
+  return contentHeadingLevels.length > 0 ? Math.min(...contentHeadingLevels) : 1;
 }
 
 function splitCodeForSlide(block, context) {
@@ -319,19 +324,19 @@ export function planSlides(document, options = {}) {
   };
   const slides = [];
   const title = options.title || document.title;
+  const primaryHeadingLevel = getPrimaryHeadingLevel(document);
   let current = null;
   let currentTitle = title;
   let currentKicker = "Markdown";
-  let currentHeadingLevel = 0;
 
-  const startSlide = ({ kicker, slideTitle, type, headingLevel } = {}) => {
+  const startSlide = ({ kicker, slideTitle, type, continuation = false } = {}) => {
     current = createSlide({
       type,
       kicker: kicker || currentKicker,
       title: slideTitle || currentTitle,
+      continuation,
       blocks: [],
     });
-    currentHeadingLevel = headingLevel || currentHeadingLevel;
     slides.push(current);
   };
 
@@ -342,12 +347,14 @@ export function planSlides(document, options = {}) {
     if (block.type === "heading") {
       const headingTitle = normalizeTitle(block.text);
       const headingKicker = sectionKicker(block.level);
+      const isSubheading = block.level > primaryHeadingLevel;
 
-      if (shouldContinueWithSubheading(current, currentHeadingLevel, block, context)) {
-        current.blocks.push({ type: "subheading", text: headingTitle, level: block.level });
-        currentTitle = headingTitle;
+      if (isSubheading) {
         currentKicker = headingKicker;
-        currentHeadingLevel = block.level;
+        if (!canAppendSubheading(current, block, context)) {
+          startSlide({ kicker: currentKicker, slideTitle: currentTitle, continuation: true });
+        }
+        current.blocks.push({ type: "subheading", text: headingTitle, level: block.level });
         continue;
       }
 
@@ -357,7 +364,6 @@ export function planSlides(document, options = {}) {
         kicker: block.level === 1 ? "Overview" : currentKicker,
         slideTitle: currentTitle,
         type: block.level === 1 && slides.length === 0 ? "cover" : undefined,
-        headingLevel: block.level,
       });
       continue;
     }
@@ -366,6 +372,7 @@ export function planSlides(document, options = {}) {
       startSlide({
         kicker: currentKicker,
         slideTitle: currentTitle,
+        continuation: Boolean(current),
       });
     }
 
@@ -377,7 +384,7 @@ export function planSlides(document, options = {}) {
       const codeParts = splitCodeForSlide(block, context);
       for (const part of codeParts) {
         if (current.blocks.length > 0 && shouldStartNewSlide(current, part, context)) {
-          startSlide({ kicker: currentKicker, slideTitle: currentTitle });
+          startSlide({ kicker: currentKicker, slideTitle: currentTitle, continuation: true });
         }
         current.blocks.push(part);
       }

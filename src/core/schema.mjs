@@ -30,9 +30,10 @@ export function createDeck({ title, brand, slides, width, height, source }) {
   };
 }
 
-export function createSlide({ type, kicker, title, hero, blocks, footer }) {
+export function createSlide({ type, kicker, title, hero, blocks, footer, continuation }) {
   return {
     ...(type ? { type } : {}),
+    ...(continuation ? { continuation: true } : {}),
     kicker: kicker || "",
     title: title || "",
     ...(hero ? { hero } : {}),

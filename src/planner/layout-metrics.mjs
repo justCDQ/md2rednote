@@ -72,14 +72,17 @@ export function estimateLineCount(text, { fontSize, contentWidth, metrics }) {
 
 export function createSlideLayout({ width, height, slide, metrics }) {
   const contentWidth = Math.max(1, width - metrics.cardPaddingLeft - metrics.cardPaddingRight);
+  const showTitle = !slide?.continuation;
   const titleFontSize = slide?.type === "cover" ? metrics.coverTitleFontSize : metrics.titleFontSize;
   const titleLineHeight = slide?.type === "cover" ? metrics.coverTitleLineHeight : metrics.titleLineHeight;
-  const titleLines = estimateLineCount(slide?.title || "", {
-    fontSize: titleFontSize,
-    contentWidth,
-    metrics,
-  });
-  const titleHeight = titleLines * titleFontSize * titleLineHeight;
+  const titleLines = showTitle
+    ? estimateLineCount(slide?.title || "", {
+        fontSize: titleFontSize,
+        contentWidth,
+        metrics,
+      })
+    : 0;
+  const titleHeight = showTitle ? titleLines * titleFontSize * titleLineHeight : 0;
   const heroHeight = slide?.hero
     ? estimateLineCount(slide.hero, {
         fontSize: metrics.heroFontSize,
@@ -94,8 +97,7 @@ export function createSlideLayout({ width, height, slide, metrics }) {
     metrics.cardPaddingTop +
     metrics.cardPaddingBottom +
     metrics.toplineHeight +
-    metrics.titleMarginTop +
-    metrics.titleMarginBottom +
+    (showTitle ? metrics.titleMarginTop + metrics.titleMarginBottom : metrics.contentGap) +
     titleHeight +
     heroHeight +
     metrics.mainReservedBottom;

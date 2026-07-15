@@ -163,6 +163,52 @@ if (previousSectionSlide?.blocks.some((block) => block.type === "paragraph" && b
   throw new Error("Content from a new heading must not be moved under the previous slide title.");
 }
 
+const continuationHeadingMarkdown = `# JavaScript Runtime
+
+## 场景二：Node.js
+
+Node.js 是服务端 JavaScript 运行时。
+
+### 为什么是非阻塞 I/O
+
+${"这是一段用于占据页面空间的非阻塞 I/O 说明。".repeat(18)}
+
+### 架构分层
+
+\`\`\`text
+${Array.from({ length: 12 }, (_, index) => `runtime layer ${index + 1}`).join("\n")}
+\`\`\`
+
+- V8：执行 JavaScript
+- libuv：提供事件循环和异步 I/O
+- C++ Bindings：连接 JavaScript 与原生能力
+`;
+const continuationHeadingDeck = planSlides(parseMarkdown(continuationHeadingMarkdown), {
+  limits: { maxCharactersPerSlide: 300, maxBlocksPerSlide: 4 },
+});
+const architectureHeadings = continuationHeadingDeck.slides.flatMap((slide) =>
+  slide.blocks.filter((block) => block.type === "subheading" && block.text === "架构分层"),
+);
+if (architectureHeadings.length !== 1) {
+  throw new Error("A nested heading must be rendered exactly once as a subheading block.");
+}
+const architectureSlides = continuationHeadingDeck.slides.filter((slide) =>
+  slide.blocks.some(
+    (block) =>
+      (block.type === "subheading" && block.text === "架构分层") ||
+      (block.type === "bullets" && block.items.some((item) => item.includes("V8"))),
+  ),
+);
+if (architectureSlides.some((slide) => slide.title !== "场景二：Node.js")) {
+  throw new Error("Nested heading content must keep its parent section title.");
+}
+if (!architectureSlides.slice(1).every((slide) => slide.continuation)) {
+  throw new Error("Pages continuing nested heading content must be marked as continuation slides.");
+}
+if (renderDeckHtml(continuationHeadingDeck, {}).includes("<h1>架构分层</h1>")) {
+  throw new Error("A nested heading must never be promoted to a repeated card title.");
+}
+
 await rm(tempOut, { recursive: true, force: true });
 const result = await buildFromMarkdown({
   input: example,

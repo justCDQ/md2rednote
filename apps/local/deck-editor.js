@@ -182,7 +182,7 @@ export function createDeckEditor({ els, getState, setState, renderDeckPreview, s
     els.editor.classList.add("active");
     els.slideList.innerHTML = currentDeck.slides.map((slide, index) => `
       <button type="button" class="slide-tab${index === selectedSlideIndex ? " active" : ""}" data-slide-index="${index}">
-        ${String(index + 1).padStart(2, "0")} / ${escapeHtml(slide.title || "未命名卡片")}
+        ${String(index + 1).padStart(2, "0")} / ${escapeHtml(slide.title || "未命名卡片")}${slide.continuation ? "（续页）" : ""}
       </button>
     `).join("");
   }
@@ -275,6 +275,7 @@ export function createDeckEditor({ els, getState, setState, renderDeckPreview, s
     const movedBlocks = slide.blocks.splice(blockIndex + 1);
     nextDeck.slides.splice(state.selectedSlideIndex + 1, 0, {
       ...slide,
+      continuation: true,
       hero: undefined,
       blocks: movedBlocks,
     });

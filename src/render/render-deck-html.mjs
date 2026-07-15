@@ -3,11 +3,12 @@ import { renderBlock } from "./block-renderers.mjs";
 import { getTheme } from "../themes/theme-registry.mjs";
 
 export function renderSlide(slide, brand) {
+  const title = slide.continuation ? "" : `<h1>${inlineMarkdown(slide.title)}</h1>`;
   return `
-    <article class="card ${slide.type || ""}">
+    <article class="card ${slide.type || ""}${slide.continuation ? " continuation" : ""}">
       <div class="topline"><span>${inlineMarkdown(slide.kicker)}</span><span>${inlineMarkdown(slide.footer)}</span></div>
       <main>
-        <h1>${inlineMarkdown(slide.title)}</h1>
+        ${title}
         ${slide.hero ? `<p class="hero">${inlineMarkdown(slide.hero)}</p>` : ""}
         <div class="content">${slide.blocks.map(renderBlock).join("\n")}</div>
       </main>
