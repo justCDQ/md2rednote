@@ -15,6 +15,7 @@ function textHeight(text, { fontSize, lineHeight, contentWidth, metrics }) {
 function listItemHeight(item, context) {
   return textHeight(item, {
     ...context,
+    contentWidth: Math.max(1, context.contentWidth - context.metrics.listIndent),
     fontSize: context.metrics.listFontSize,
     lineHeight: context.metrics.listLineHeight,
   });
@@ -73,9 +74,19 @@ export function estimateBlockHeight(block, context) {
 
   if (block.type === "table") {
     const rows = block.rows || [];
-    const headerHeight = metrics.tableFontSize * metrics.tableLineHeight + metrics.tableCellPaddingY;
     const columnCount = Math.max(1, block.headers?.length || rows[0]?.length || 1);
-    const cellWidth = contentWidth / columnCount;
+    const cellWidth = Math.max(1, contentWidth / columnCount - metrics.tableCellPaddingX);
+    const headerLines = Math.max(
+      1,
+      ...(block.headers || []).map((header) =>
+        estimateLineCount(header, {
+          fontSize: metrics.tableFontSize,
+          contentWidth: cellWidth,
+          metrics,
+        }),
+      ),
+    );
+    const headerHeight = headerLines * metrics.tableFontSize * metrics.tableLineHeight + metrics.tableCellPaddingY;
     const rowHeights = rows.map((row) => {
       const maxCellLines = Math.max(
         1,

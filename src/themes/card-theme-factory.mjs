@@ -106,6 +106,13 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
       display: flex;
       flex-direction: column;
       gap: 30px;
+      min-width: 0;
+    }
+    .content > * {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     p {
       margin: 0;
@@ -136,7 +143,7 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
     strong { color: ${p.text}; font-weight: 850; }
     em { font-style: normal; color: ${p.accent}; font-weight: 800; }
     code.inline {
-      display: inline-block;
+      display: inline;
       padding: 2px 9px;
       border: 1px solid ${p.inlineBorder};
       border-radius: 7px;
@@ -144,6 +151,11 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
       color: ${p.accent};
       font-family: "SFMono-Regular", Menlo, Consolas, monospace;
       font-size: 0.88em;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
     }
     blockquote {
       margin: 8px 0 0;
@@ -162,9 +174,10 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
       font-size: 34px;
       line-height: 1.54;
     }
-    li { margin: 0 0 20px; padding-left: 8px; overflow-wrap: anywhere; }
+    li { margin: 0 0 20px; padding-left: 8px; overflow-wrap: anywhere; word-break: break-word; }
     table {
       width: 100%;
+      table-layout: fixed;
       border-collapse: collapse;
       background: ${p.surface};
       color: ${p.bodyText};
@@ -177,6 +190,7 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
       vertical-align: top;
       text-align: left;
       overflow-wrap: anywhere;
+      word-break: break-word;
     }
     th {
       background: ${p.text};

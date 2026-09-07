@@ -209,6 +209,54 @@ if (renderDeckHtml(continuationHeadingDeck, {}).includes("<h1>架构分层</h1>"
   throw new Error("A nested heading must never be promoted to a repeated card title.");
 }
 
+const compactTableMarkdown = `## 表格保持完整
+
+| 序号 | 说明 |
+| --- | --- |
+${Array.from({ length: 7 }, (_, index) => `| ${index + 1} | 简短内容 ${index + 1} |`).join("\n")}
+`;
+const compactTableDeck = planSlides(parseMarkdown(compactTableMarkdown), {});
+const compactTableBlocks = compactTableDeck.slides.flatMap((slide) => slide.blocks).filter((block) => block.type === "table");
+if (compactTableBlocks.length !== 1 || compactTableBlocks[0].rows.length !== 7) {
+  throw new Error("A table that fits on one page must stay as one table even when it exceeds the soft row limit.");
+}
+
+const longListMarkdown = `## 列表自动分页
+
+${Array.from(
+  { length: 14 },
+  (_, index) => `${index + 1}. 第 ${index + 1} 项包含足够多的说明文字，用来验证列表会根据页面实际高度自动换页并保持连续编号。`,
+).join("\n")}
+`;
+const longListDeck = planSlides(parseMarkdown(longListMarkdown), {});
+const orderedListBlocks = longListDeck.slides.flatMap((slide) => slide.blocks).filter((block) => block.type === "steps");
+if (orderedListBlocks.length < 2 || orderedListBlocks.some((block) => block.items.length > 5)) {
+  throw new Error("An oversized ordered list must be split into page-sized blocks.");
+}
+for (let index = 1; index < orderedListBlocks.length; index += 1) {
+  const expectedStart = orderedListBlocks
+    .slice(0, index)
+    .reduce((total, block) => total + block.items.length, 1);
+  if (orderedListBlocks[index].start !== expectedStart) {
+    throw new Error("Ordered-list numbering must continue across generated pages.");
+  }
+}
+const longListHtml = renderDeckHtml(longListDeck, {});
+if (!longListHtml.includes(`start="${orderedListBlocks[1].start}"`)) {
+  throw new Error("Rendered ordered-list continuations must include the correct HTML start value.");
+}
+
+const longAddressHtml = renderDeckHtml(
+  planSlides(
+    parseMarkdown(`## 长地址\n\nhttps://example.com/${"very-long-path-segment".repeat(20)}\n\n| 地址 |\n| --- |\n| \`${"https://example.com/no-break/".repeat(12)}\` |`),
+    {},
+  ),
+  {},
+);
+if (!longAddressHtml.includes("table-layout: fixed") || !longAddressHtml.includes("word-break: break-all")) {
+  throw new Error("Rendered cards must include forced wrapping rules for long addresses and inline code.");
+}
+
 await rm(tempOut, { recursive: true, force: true });
 const result = await buildFromMarkdown({
   input: example,

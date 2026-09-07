@@ -28,6 +28,7 @@ function pushParagraph(blocks, lines) {
 
 function parseList(lines, startIndex) {
   const ordered = /^\s*\d+\.\s+/.test(lines[startIndex]);
+  const start = ordered ? Number.parseInt(lines[startIndex].match(/^\s*(\d+)\./)?.[1] || "1", 10) : undefined;
   const markerPattern = ordered ? /^\s*\d+\.\s+/ : /^\s*[-*+]\s+/;
   const items = [];
   let index = startIndex;
@@ -41,6 +42,7 @@ function parseList(lines, startIndex) {
     block: {
       type: ordered ? "steps" : "bullets",
       items,
+      ...(ordered && start !== 1 ? { start } : {}),
     },
     nextIndex: index,
   };

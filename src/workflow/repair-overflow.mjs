@@ -37,7 +37,16 @@ function splitBlock(block) {
 
   if (block.type === "bullets" || block.type === "steps") {
     const parts = splitItems(block.items);
-    return parts?.length === 2 ? parts.map((items) => ({ ...block, items })) : null;
+    if (parts?.length !== 2) return null;
+    const firstLength = parts[0].length;
+    const start = Number(block.start) || 1;
+    return parts.map((items, index) => ({
+      ...block,
+      items,
+      ...(block.type === "steps" && start + index * firstLength > 1
+        ? { start: start + index * firstLength }
+        : {}),
+    }));
   }
 
   if (block.type === "code") {

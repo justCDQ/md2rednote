@@ -9,8 +9,9 @@ function renderSubheading(block) {
   return `<h2 class="subheading">${inlineMarkdown(block.text)}</h2>`;
 }
 
-function renderList(tag, items) {
-  return `<${tag}>${items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</${tag}>`;
+function renderList(tag, block) {
+  const start = tag === "ol" && block.start > 1 ? ` start="${Number(block.start)}"` : "";
+  return `<${tag}${start}>${block.items.map((item) => `<li>${inlineMarkdown(item)}</li>`).join("")}</${tag}>`;
 }
 
 function renderCode(block) {
@@ -87,9 +88,9 @@ export function renderBlock(block) {
     case "paragraph":
       return renderParagraph(block);
     case "bullets":
-      return renderList("ul", block.items);
+      return renderList("ul", block);
     case "steps":
-      return renderList("ol", block.items);
+      return renderList("ol", block);
     case "code":
       return renderCode(block);
     case "quote":

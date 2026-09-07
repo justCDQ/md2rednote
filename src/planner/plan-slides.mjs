@@ -278,6 +278,77 @@ function splitCodeForSlide(block, context) {
   }));
 }
 
+function splitOversizedFlowBlock(block, slide, context) {
+  const isList = block.type === "bullets" || block.type === "steps";
+  const isTable = block.type === "table";
+  if (!isList && !isTable) return [block];
+
+  const entries = isTable ? block.rows || [] : block.items || [];
+  if (entries.length < 2) return [block];
+
+  const emptySlide = slide
+    ? { ...slide, type: slide.type === "cover" ? "cover" : undefined, blocks: [] }
+    : createSlide({ title: "", blocks: [] });
+  const availableHeight = getSlideUsage(emptySlide, context).availableHeight;
+  const fullHeight = estimateBlockHeight(block, {
+    metrics: context.metrics,
+    contentWidth: getSlideUsage(emptySlide, context).contentWidth,
+  });
+
+  // Keep a table or list as one semantic block whenever it fits on a fresh page.
+  // Fixed row/item limits are only caps for blocks that genuinely need pagination.
+  if (fullHeight <= availableHeight) return [block];
+
+  const configuredLimit = isTable
+    ? context.limits.maxTableRowsPerBlock
+    : context.limits.maxListItemsPerBlock;
+  const maxEntries = Math.max(1, Number(configuredLimit) || entries.length);
+  const baseStart = Number(block.start) || 1;
+  const chunks = [];
+  let entryIndex = 0;
+
+  while (entryIndex < entries.length) {
+    const chunkStart = entryIndex;
+    const chunk = [];
+
+    while (entryIndex < entries.length && chunk.length < maxEntries) {
+      const candidateEntries = [...chunk, entries[entryIndex]];
+      const candidate = isTable
+        ? { ...block, rows: candidateEntries }
+        : {
+            ...block,
+            items: candidateEntries,
+            ...(block.type === "steps" && baseStart + chunkStart > 1
+              ? { start: baseStart + chunkStart }
+              : {}),
+          };
+      const candidateHeight = estimateBlockHeight(candidate, {
+        metrics: context.metrics,
+        contentWidth: getSlideUsage(emptySlide, context).contentWidth,
+      });
+
+      if (chunk.length > 0 && candidateHeight > availableHeight) break;
+      chunk.push(entries[entryIndex]);
+      entryIndex += 1;
+      if (candidateHeight > availableHeight) break;
+    }
+
+    chunks.push(
+      isTable
+        ? { ...block, rows: chunk }
+        : {
+            ...block,
+            items: chunk,
+            ...(block.type === "steps" && baseStart + chunkStart > 1
+              ? { start: baseStart + chunkStart }
+              : {}),
+          },
+    );
+  }
+
+  return chunks;
+}
+
 function normalizeLimits(inputLimits) {
   const profile = DENSITY_PROFILES[inputLimits.densityProfile] || DENSITY_PROFILES.standard;
   const maxCharactersPerSlide = Math.max(120, Math.round(inputLimits.maxCharactersPerSlide * profile.characterMultiplier));
@@ -341,7 +412,9 @@ export function planSlides(document, options = {}) {
   };
 
   for (const rawBlock of document.blocks) {
-    const blocks = rawBlock.type === "heading" ? [rawBlock] : splitBlock(rawBlock, limits);
+    const normalizedBlocks = rawBlock.type === "heading" ? [rawBlock] : splitBlock(rawBlock, limits);
+    const layoutSlide = current || createSlide({ kicker: currentKicker, title: currentTitle, blocks: [] });
+    const blocks = normalizedBlocks.flatMap((block) => splitOversizedFlowBlock(block, layoutSlide, context));
 
     for (const block of blocks) {
     if (block.type === "heading") {
