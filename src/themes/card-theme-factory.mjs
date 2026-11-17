@@ -223,6 +223,43 @@ export function createCardTheme({ width, height, palette = {}, extraCss = "" }) 
     pre.code code {
       display: block;
     }
+    .mermaid-diagram {
+      --mermaid-bg: ${p.surface};
+      --mermaid-fg: ${p.text};
+      --mermaid-line: ${p.muted};
+      --mermaid-accent: ${p.accent};
+      --mermaid-muted: ${p.muted};
+      --mermaid-surface: ${p.surfaceAlt};
+      --mermaid-border: ${p.border};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 24px;
+      overflow: hidden;
+      border: 2px solid ${p.border};
+      background: ${p.surface};
+    }
+    .mermaid-diagram svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 720px;
+    }
+    .mermaid-error {
+      display: block;
+      color: ${p.bodyText};
+    }
+    .mermaid-error strong, .mermaid-error small {
+      display: block;
+      margin-bottom: 12px;
+    }
+    .mermaid-error pre {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 22px/1.45 "SFMono-Regular", Menlo, Consolas, monospace;
+    }
     .tok-comment { color: ${p.codeComment || "#8f9b8d"}; }
     .tok-keyword { color: ${p.codeKeyword || p.codeAccent}; font-weight: 850; }
     .tok-string { color: ${p.codeString || "#f6c177"}; }

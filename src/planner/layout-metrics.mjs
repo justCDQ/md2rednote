@@ -31,6 +31,8 @@ export const DEFAULT_LAYOUT_METRICS = {
   codeLineHeight: 1.48,
   codePaddingY: 60,
   codeLabelHeight: 45,
+  mermaidMaxHeight: 720,
+  mermaidPaddingY: 48,
   tableFontSize: 29,
   tableLineHeight: 1.42,
   tableCellPaddingY: 48,

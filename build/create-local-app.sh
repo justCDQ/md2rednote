@@ -14,6 +14,11 @@ APP_DIR="${DIST}/${APP_NAME}.app"
 CONTENTS="${APP_DIR}/Contents"
 MACOS="${CONTENTS}/MacOS"
 RESOURCES="${CONTENTS}/Resources"
+BUILD_WINDOWS="1"
+
+if [[ "${1:-}" == "--macos-only" ]]; then
+  BUILD_WINDOWS="0"
+fi
 
 mkdir -p "${DIST}"
 
@@ -91,17 +96,18 @@ rm -f "${MAC_ZIP}" "${APP_NAME}-mac.zip"
 ditto -c -k --sequesterRsrc --keepParent "${APP_NAME}.app" "${MAC_ZIP}"
 cd "${ROOT}"
 
-echo "Building Windows portable package..."
-WIN_DIR="${DIST}/${APP_NAME}-win"
-rm -rf "${WIN_DIR}"
-mkdir -p "${WIN_DIR}"
+if [[ "${BUILD_WINDOWS}" == "1" ]]; then
+  echo "Building Windows portable package..."
+  WIN_DIR="${DIST}/${APP_NAME}-win"
+  rm -rf "${WIN_DIR}"
+  mkdir -p "${WIN_DIR}"
 
-bun build --compile --target=bun-windows-x64 "${ROOT}/apps/local/server.ts" --outfile "${WIN_DIR}/${BIN_NAME}.exe"
-cp "${ROOT}/apps/local/index.html" "${WIN_DIR}/"
-cp "${ROOT}/apps/local/"*.js "${WIN_DIR}/"
-cp "${ROOT}/apps/local/"*.css "${WIN_DIR}/"
+  bun build --compile --target=bun-windows-x64 "${ROOT}/apps/local/server.ts" --outfile "${WIN_DIR}/${BIN_NAME}.exe"
+  cp "${ROOT}/apps/local/index.html" "${WIN_DIR}/"
+  cp "${ROOT}/apps/local/"*.js "${WIN_DIR}/"
+  cp "${ROOT}/apps/local/"*.css "${WIN_DIR}/"
 
-cat > "${WIN_DIR}/start.bat" << BAT
+  cat > "${WIN_DIR}/start.bat" << BAT
 @echo off
 cd /d "%~dp0"
 set RESOURCES_DIR=%~dp0
@@ -113,12 +119,15 @@ timeout /t 2 /nobreak >nul
 start http://localhost:${PORT}/
 BAT
 
-cd "${DIST}"
-rm -f "${WIN_ZIP}" "${APP_NAME}-win.zip"
-zip -r "${WIN_ZIP}" "${APP_NAME}-win/"
-cd "${ROOT}"
-rm -rf "${WIN_DIR}"
+  cd "${DIST}"
+  rm -f "${WIN_ZIP}" "${APP_NAME}-win.zip"
+  zip -r "${WIN_ZIP}" "${APP_NAME}-win/"
+  cd "${ROOT}"
+  rm -rf "${WIN_DIR}"
+fi
 
 echo "Done:"
 echo "  macOS:   ${MAC_ZIP}"
-echo "  Windows: ${WIN_ZIP}"
+if [[ "${BUILD_WINDOWS}" == "1" ]]; then
+  echo "  Windows: ${WIN_ZIP}"
+fi

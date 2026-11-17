@@ -1,5 +1,6 @@
 import { escapeHtml, inlineMarkdown } from "./escape-html.mjs";
 import { highlightCode } from "./code-highlight.mjs";
+import { renderMermaidDiagram } from "./mermaid-renderer.mjs";
 
 function renderParagraph(block) {
   return `<p>${inlineMarkdown(block.text)}</p>`;
@@ -17,6 +18,14 @@ function renderList(tag, block) {
 function renderCode(block) {
   const label = block.caption ? `${block.lang || "text"} / ${block.caption}` : block.lang || "text";
   return `<pre class="code" data-lang="${escapeHtml(label)}"><code>${highlightCode(block.source, block.lang)}</code></pre>`;
+}
+
+function renderMermaid(block) {
+  const rendered = renderMermaidDiagram(block.source);
+  if (rendered.error) {
+    return `<figure class="mermaid-diagram mermaid-error"><strong>Mermaid 流程图解析失败</strong><small>${escapeHtml(rendered.error)}</small><pre>${escapeHtml(block.source)}</pre></figure>`;
+  }
+  return `<figure class="mermaid-diagram">${rendered.svg}</figure>`;
 }
 
 function renderQuote(block) {
@@ -93,6 +102,8 @@ export function renderBlock(block) {
       return renderList("ol", block);
     case "code":
       return renderCode(block);
+    case "mermaid":
+      return renderMermaid(block);
     case "quote":
       return renderQuote(block);
     case "table":

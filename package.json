@@ -20,6 +20,7 @@
     "check": "node ./scripts/check.mjs",
     "local:dev": "bun run apps/local/server.ts",
     "local:build": "bash build/create-local-app.sh",
+    "local:build:macos": "bash build/create-local-app.sh --macos-only",
     "release:check": "node ./scripts/release-check.mjs"
   },
   "keywords": [
@@ -31,6 +32,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "beautiful-mermaid": "^1.1.3",
     "playwright": "^1.45.0"
   },
   "engines": {

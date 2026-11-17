@@ -257,6 +257,43 @@ if (!longAddressHtml.includes("table-layout: fixed") || !longAddressHtml.include
   throw new Error("Rendered cards must include forced wrapping rules for long addresses and inline code.");
 }
 
+const mermaidMarkdown = `## Mermaid 流程图
+
+\`\`\`mermaid
+flowchart TD
+  A[读取 Markdown] --> B{内容类型}
+  B -->|流程图| C[生成 SVG]
+  B -->|普通内容| D[卡片渲染]
+\`\`\`
+
+\`\`\`js
+console.log("still code");
+\`\`\`
+`;
+const mermaidDocument = parseMarkdown(mermaidMarkdown);
+const mermaidBlock = mermaidDocument.blocks.find((block) => block.type === "mermaid");
+if (!mermaidBlock || !mermaidBlock.source.includes("flowchart TD")) {
+  throw new Error("Fenced mermaid blocks must be parsed as Mermaid diagram blocks.");
+}
+if (!mermaidDocument.blocks.some((block) => block.type === "code" && block.lang === "js")) {
+  throw new Error("Non-Mermaid fenced blocks must remain regular code blocks.");
+}
+const mermaidDeck = planSlides(mermaidDocument, {});
+const mermaidHtml = renderDeckHtml(mermaidDeck, {});
+if (!mermaidHtml.includes('<figure class="mermaid-diagram"><svg') || !mermaidHtml.includes("读取 Markdown")) {
+  throw new Error("Mermaid blocks must render to inline SVG diagrams.");
+}
+if (/fonts\.googleapis\.com/i.test(mermaidHtml)) {
+  throw new Error("Rendered Mermaid SVG must not depend on external font resources.");
+}
+const invalidMermaidHtml = renderDeckHtml(
+  planSlides(parseMarkdown("```mermaid\nflowchart TD\n  A[broken\n```"), {}),
+  {},
+);
+if (!invalidMermaidHtml.includes("mermaid-error")) {
+  throw new Error("Invalid Mermaid source must produce an in-card diagnostic instead of breaking rendering.");
+}
+
 await rm(tempOut, { recursive: true, force: true });
 const result = await buildFromMarkdown({
   input: example,

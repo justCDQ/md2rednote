@@ -10,6 +10,7 @@ function blockLabel(block) {
     subheading: "子标题",
     quote: "引用",
     code: "代码",
+    mermaid: "Mermaid 流程图",
     bullets: "无序列表",
     steps: "有序列表",
     table: "表格 JSON",
@@ -53,6 +54,14 @@ function renderBlockEditor(block, index) {
         <input data-field="lang" value="${escapeHtml(block.lang || "")}" placeholder="语言，例如 js" />
         <input data-field="caption" value="${escapeHtml(block.caption || "")}" placeholder="说明，可选" />
         <textarea data-field="source">${escapeHtml(block.source || "")}</textarea>
+      </div>
+    `;
+  }
+  if (type === "mermaid") {
+    return `
+      <div class="block-editor" data-block-index="${index}" data-block-type="mermaid">
+        ${toolbar}
+        <textarea data-field="source" placeholder="flowchart TD&#10;  A[开始] --&gt; B[结束]">${escapeHtml(block.source || "")}</textarea>
       </div>
     `;
   }
@@ -119,6 +128,7 @@ function readBlockEditor(node) {
       source: value("source"),
     };
   }
+  if (type === "mermaid") return { type, lang: "mermaid", source: value("source") };
   if (ITEM_BLOCK_TYPES.has(type)) {
     return { type, items: value("items").split("\n").map((item) => item.trim()).filter(Boolean) };
   }
@@ -141,6 +151,7 @@ function createBlock(type) {
   if (type === "subheading") return { type, text: "新的子标题", level: 4 };
   if (type === "bullets" || type === "steps") return { type, items: ["新的要点"] };
   if (type === "code") return { type, lang: "js", source: "console.log(\"hello\");" };
+  if (type === "mermaid") return { type, lang: "mermaid", source: "flowchart TD\n  A[开始] --> B[结束]" };
   if (type === "answer") return { type, label: "答案", text: "这里填写答案内容" };
   if (type === "image") return { type, src: "", alt: "图片说明" };
   return { type: "paragraph", text: "新的段落内容" };

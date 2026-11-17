@@ -1,4 +1,5 @@
 import { createSlideLayout, estimateLineCount, mergeLayoutMetrics } from "./layout-metrics.mjs";
+import { estimateMermaidDiagramHeight } from "../render/mermaid-renderer.mjs";
 
 function textHeight(text, { fontSize, lineHeight, contentWidth, metrics }) {
   return (
@@ -70,6 +71,13 @@ export function estimateBlockHeight(block, context) {
   if (block.type === "code") {
     const lines = String(block.source || "").split("\n").length || 1;
     return lines * metrics.codeFontSize * metrics.codeLineHeight + metrics.codePaddingY + metrics.codeLabelHeight;
+  }
+
+  if (block.type === "mermaid") {
+    return (
+      estimateMermaidDiagramHeight(block.source, contentWidth, metrics.mermaidMaxHeight) +
+      metrics.mermaidPaddingY
+    );
   }
 
   if (block.type === "table") {

@@ -29,6 +29,7 @@ export function blockWeight(block) {
   if (block.type === "paragraph" || block.type === "quote" || block.type === "subheading") return block.text.length;
   if (block.type === "bullets" || block.type === "steps") return block.items.join("").length + block.items.length * 12;
   if (block.type === "code") return block.source.length * 1.2;
+  if (block.type === "mermaid") return Math.min(240, 120 + block.source.length * 0.35);
   if (block.type === "table") return JSON.stringify(block.headers).length + JSON.stringify(block.rows).length;
   if (block.type === "image") return 120;
   return JSON.stringify(block).length;
@@ -40,7 +41,7 @@ function slideWeight(slide) {
 
 function isHeavyBlock(block, context) {
   if (!block) return false;
-  if (block.type === "table" || block.type === "image") return true;
+  if (block.type === "table" || block.type === "image" || block.type === "mermaid") return true;
   return block.type === "code" && codeLineCount(block) > Math.max(10, context.limits.maxCodeLinesPerSlide * 0.55);
 }
 

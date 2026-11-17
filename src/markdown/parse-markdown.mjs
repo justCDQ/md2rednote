@@ -75,7 +75,11 @@ function parseCodeBlock(lines, startIndex) {
   }
 
   return {
-    block: { type: "code", lang, source: source.join("\n") },
+    block: {
+      type: ["mermaid", "mmd"].includes(lang.toLowerCase()) ? "mermaid" : "code",
+      ...(lang.toLowerCase() === "mmd" ? { lang: "mermaid" } : { lang }),
+      source: source.join("\n"),
+    },
     nextIndex: index < lines.length ? index + 1 : index,
   };
 }

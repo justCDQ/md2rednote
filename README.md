@@ -66,7 +66,7 @@ Markdown
 -> PNG cards
 ```
 
-The first version is conservative: it keeps the article structure and turns headings, paragraphs, lists, quotes, tables, images, and fenced code blocks into editable card data. It does not rewrite the article into marketing copy.
+The first version is conservative: it keeps the article structure and turns headings, paragraphs, lists, quotes, tables, images, fenced code blocks, and Mermaid diagrams into editable card data. It does not rewrite the article into marketing copy.
 
 The current content splitting flow does not call an LLM. It uses deterministic Markdown parsing, block splitting, and pagination rules.
 
@@ -213,10 +213,22 @@ Supported in the first version:
 - unordered lists
 - ordered lists
 - fenced code blocks
+- Mermaid diagrams in fenced `mermaid` or `mmd` blocks (rendered as offline SVG)
 - blockquotes
 - pipe tables
 - Markdown images
 - YAML frontmatter stripping
+
+Example:
+
+````markdown
+```mermaid
+flowchart TD
+  A[读取 Markdown] --> B{内容类型}
+  B -->|流程图| C[生成 SVG]
+  B -->|其他内容| D[普通卡片渲染]
+```
+````
 
 Typora Markdown is supported as normal Markdown. Typora-specific customization should be layered on top of this core instead of being embedded into the reusable modules.
 
